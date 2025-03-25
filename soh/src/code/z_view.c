@@ -6,6 +6,7 @@
 #include <assert.h>
 
 #include "soh/frame_interpolation.h"
+#include "vr/vr_manager.h"
 
 vu32 D_8012ABF0 = true;
 
@@ -138,6 +139,43 @@ void func_800AA4E0(View* view, f32* fovy, f32* near, f32* far) {
 void View_SetViewport(View* view, Viewport* viewport) {
     view->viewport = *viewport;
     view->flags |= 2;
+}
+
+void View_SetVRStereoView(View* view, VRManager* vrManager) {
+    if (vrManager == NULL) {
+        osSyncPrintf("VR Manager not available for stereo view\n");
+        return;
+    }
+
+    if (!VRManager_IsHMDPresent()) {
+        osSyncPrintf("No HMD detected for stereo view\n");
+        return;
+    }
+
+    // Update HMD pose
+    VRManager_UpdateHMDMatrixPose(vrManager);
+
+    // Set up stereo rendering
+    for (int eye = 0; eye < 2; eye++) {
+        EVREye vrEye = (eye == 0) ? EVREye_Eye_Left : EVREye_Eye_Right;
+        
+        // Get projection and view matrices for this eye
+        MtxF projMat = VRManager_GetHMDMatrixProjectionEye(vrManager, vrEye);
+        MtxF eyeMat = VRManager_GetHMDMatrixPoseEye(vrManager, vrEye);
+        
+        // Set up viewport for this eye
+        view->viewport.leftX = (eye == 0) ? 0 : SCREEN_WIDTH/2;
+        view->viewport.rightX = (eye == 0) ? SCREEN_WIDTH/2 : SCREEN_WIDTH;
+        view->viewport.topY = 0;
+        view->viewport.bottomY = SCREEN_HEIGHT;
+        
+        // Apply VR matrices using the matrix fields
+        guMtxCatF(projMat.mf, view->projection.m, view->projection.m);
+        guMtxCatF(eyeMat.mf, view->viewing.m, view->viewing.m);
+    }
+    
+    // Mark view as needing update
+    view->flags |= (1 | 2 | 4);
 }
 
 void View_GetViewport(View* view, Viewport* viewport) {
@@ -334,7 +372,7 @@ s32 func_800AAA9C(View* view) {
 
     func_800ABE74(view->eye.x, view->eye.y, view->eye.z);
     MtxF viewingF;
-    guLookAtF(viewingF.mf, view->eye.x, view->eye.y, view->eye.z, view->lookAt.x, view->lookAt.y, view->lookAt.z, view->up.x,
+    guLookAtF(&viewingF, view->eye.x, view->eye.y, view->eye.z, view->lookAt.x, view->lookAt.y, view->lookAt.z, view->up.x,
              view->up.y, view->up.z);
 
     // Some heuristics to identify instant camera movements and skip interpolation in that case
@@ -449,7 +487,7 @@ s32 func_800AAA9C(View* view) {
     gSPPerspNormalize(POLY_XLU_DISP++, view->normal);
     gSPMatrix(POLY_XLU_DISP++, projection, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_PROJECTION);
 
-    Matrix_MtxFToMtx(viewingF.mf, viewing);
+    Matrix_MtxFToMtx(&viewingF, viewing);
 
     view->viewing = *viewing;
 

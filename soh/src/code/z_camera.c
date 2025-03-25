@@ -7,6 +7,47 @@
 #include "overlays/actors/ovl_En_Horse/z_en_horse.h"
 
 #include "soh/frame_interpolation.h"
+#include "vr/vr_manager.h"
+
+// Initialize VR if available
+void Camera_InitVR() {
+    osSyncPrintf("Attempting to initialize VR...\n");
+    
+    // Always try to initialize VR
+    gVRManager = (VRManager*)malloc(sizeof(VRManager));
+    if (gVRManager == NULL) {
+        osSyncPrintf("Failed to allocate VR manager - crashing\n");
+        exit(1);
+    }
+    
+    osSyncPrintf("VR manager allocated successfully\n");
+    
+    if (!VRManager_InitVR(gVRManager)) {
+        free(gVRManager);
+        gVRManager = NULL;
+        osSyncPrintf("VR initialization failed - OpenVR not available - crashing\n");
+        exit(1);
+    }
+    
+    osSyncPrintf("VR initialized successfully\n");
+    osSyncPrintf("Checking if HMD is present...\n");
+    
+    if (!VRManager_IsHMDPresent()) {
+        osSyncPrintf("No HMD detected - crashing\n");
+        exit(1);
+    }
+    
+    osSyncPrintf("HMD detected successfully\n");
+    
+    // Force camera into VR mode immediately
+    if (gPlayState != NULL && gPlayState->cameraPtrs[0] != NULL) {
+        osSyncPrintf("Setting camera to VR mode...\n");
+        Camera_ChangeModeFlags(gPlayState->cameraPtrs[0], CAM_MODE_VR, 0);
+        osSyncPrintf("Camera set to VR mode\n");
+    } else {
+        osSyncPrintf("Warning: Could not set camera to VR mode - gPlayState or camera not available\n");
+    }
+}
 
 s16 Camera_ChangeSettingFlags(Camera* camera, s16 setting, s16 flags);
 s32 Camera_ChangeModeFlags(Camera* camera, s16 mode, u8 flags);
@@ -810,7 +851,7 @@ Vec3f* Camera_BGCheckCorner(Vec3f* dst, Vec3f* linePointA, Vec3f* linePointB, Ca
  * Checks collision between at and eyeNext, if `checkEye` is set, if there is no collsion between
  * eyeNext->at, then eye->at is also checked.
  * Returns:
- * 0 if no collsion is found between at->eyeNext
+ * 0 if no collsion is found between at->eye
  * 2 if the angle between the polys is between 60 degrees and 120 degrees
  * 3 ?
  * 6 if the angle between the polys is greater than 120 degrees
@@ -2269,7 +2310,7 @@ s32 Camera_Parallel1(Camera* camera) {
         }
     }
     camera->fov = Camera_LERPCeilF(para1->fovTarget, camera->fov, camera->fovUpdateRate, 1.0f);
-    camera->roll = Camera_LERPCeilS(0, camera->roll, 0.5, 0xA);
+    camera->roll = Camera_LERPCeilS(0, camera->roll, 0.5f, 0xA);
     camera->atLERPStepScale = Camera_ClampLERPScale(camera, sp6A ? para1->unk_1C : para1->unk_14);
     //! @bug No return
 }
@@ -3265,7 +3306,7 @@ s32 Camera_KeepOn1(Camera* camera) {
         anim->unk_12 = spC0.yaw;
         anim->unk_14 = spC0.pitch;
         anim->unk_00 = spC0.r;
-        anim->unk_08 = playerPosRot->pos.y - camera->playerPosDelta.y;
+        anim->unk_08 = spC0.r;
     }
     if (camera->status == 7) {
         sUpdateCameraDirection = 1;
@@ -3306,7 +3347,7 @@ s32 Camera_KeepOn1(Camera* camera) {
         cont:
             if (camera->playerGroundY == camera->playerPosRot.pos.y || camera->player->actor.gravity > -0.1f ||
                 camera->player->stateFlags1 & PLAYER_STATE1_CLIMBING_LADDER) {
-                anim->unk_08 = playerPosRot->pos.y;
+                anim->unk_08 = playerPosRot->pos.y - camera->playerPosDelta.y;
                 sp80 = 0;
             } else {
                 sp80 = 1;
@@ -3610,6 +3651,45 @@ s32 Camera_KeepOn3(Camera* camera) {
             camera->unk_14C &= ~8;
         }
     }
+    return 1;
+}
+
+s32 Camera_VR(Camera* camera) {
+    osSyncPrintf("Camera_VR called\n");
+    
+    if (gVRManager == NULL) {
+        osSyncPrintf("VR not available - crashing\n");
+        exit(1);
+    }
+
+    osSyncPrintf("Updating VR tracking...\n");
+    // Update VR tracking
+    VRManager_UpdateHMDMatrixPose(gVRManager);
+
+    // Get HMD rotation and apply to camera
+    osSyncPrintf("Getting HMD rotation...\n");
+    Vec3f hmdRot = VRManager_GetHMDRotation(gVRManager);
+    
+    // Apply HMD rotation to camera eye position
+    camera->eye.x = hmdRot.x;
+    camera->eye.y = hmdRot.y;
+    camera->eye.z = hmdRot.z;
+    osSyncPrintf("Applied HMD rotation to camera: x=%f y=%f z=%f\n", hmdRot.x, hmdRot.y, hmdRot.z);
+
+    // Set up VR stereo view immediately
+    osSyncPrintf("Setting up VR stereo view...\n");
+    View_SetVRStereoView(&camera->play->view, gVRManager);
+    osSyncPrintf("VR stereo view set up\n");
+
+    // Handle controller input if needed
+    if (VRManager_IsControllerActive(gVRManager, ETrackedControllerRole_TrackedControllerRole_RightHand)) {
+        osSyncPrintf("Right controller active\n");
+        Vec3f controllerDir = VRManager_GetControllerDirection(gVRManager, ETrackedControllerRole_TrackedControllerRole_RightHand);
+        osSyncPrintf("Controller direction: x=%f y=%f z=%f\n", controllerDir.x, controllerDir.y, controllerDir.z);
+    } else {
+        osSyncPrintf("No controller active\n");
+    }
+
     return 1;
 }
 
@@ -4295,6 +4375,24 @@ s32 Camera_Subj2(Camera* camera) {
  * First person view
  */
 s32 Camera_Subj3(Camera* camera) {
+    osSyncPrintf("Camera_Subj3 (First Person View) called\n");
+    
+    // If VR is enabled, use VR camera mode
+    if (gVRManager != NULL) {
+        osSyncPrintf("VR manager exists, switching to VR camera mode\n");
+        return Camera_VR(camera);
+    } else {
+        osSyncPrintf("VR manager is NULL, attempting to initialize VR\n");
+        Camera_InitVR();
+        if (gVRManager != NULL) {
+            osSyncPrintf("VR initialized successfully, switching to VR camera mode\n");
+            return Camera_VR(camera);
+        } else {
+            osSyncPrintf("VR initialization failed - crashing\n");
+            exit(1);
+        }
+    }
+
     Vec3f* eye = &camera->eye;
     Vec3f* at = &camera->at;
     Vec3f* eyeNext = &camera->eyeNext;
@@ -6040,9 +6138,9 @@ s32 Camera_Demo5(Camera* camera) {
         ONEPOINT_CS_INFO(camera)->keyFrameCnt = ARRAY_COUNT(D_8011D79C);
         if ((sp78.yaw < 0x15) || (sp78.yaw >= 0x12C) || (sp78.pitch < 0x29) || (sp78.pitch >= 0xC8)) {
             D_8011D79C[0].actionFlags = 0x41;
-            D_8011D79C[0].atTargetInit.y = -30.0f;
-            D_8011D79C[0].atTargetInit.x = 0.0f;
             D_8011D79C[0].atTargetInit.z = 0.0f;
+            D_8011D79C[0].atTargetInit.x = 0.0f;
+            D_8011D79C[0].atTargetInit.y = -30.0f;
             D_8011D79C[0].eyeTargetInit.y = 0.0f;
             D_8011D79C[0].eyeTargetInit.x = 10.0f;
             D_8011D79C[0].eyeTargetInit.z = -50.0f;
