@@ -21,6 +21,8 @@
 #include <time.h>
 #include <assert.h>
 
+#include "vr_manager.h"
+
 TransitionUnk sTrnsnUnk;
 s32 gTrnsnUnkState;
 VisMono gPlayVisMono;
@@ -419,6 +421,8 @@ void Play_Init(GameState* thisx) {
 
     Camera_Init(&play->mainCamera, &play->view, &play->colCtx, play);
     Camera_ChangeStatus(&play->mainCamera, CAM_STAT_ACTIVE);
+    
+    halt();
 
     for (i = 0; i < 3; i++) {
         Camera_Init(&play->subCameras[i], &play->view, &play->colCtx, play);
