@@ -422,7 +422,7 @@ void Play_Init(GameState* thisx) {
     Camera_Init(&play->mainCamera, &play->view, &play->colCtx, play);
     Camera_ChangeStatus(&play->mainCamera, CAM_STAT_ACTIVE);
     
-    halt();
+    vr_main();
 
     for (i = 0; i < 3; i++) {
         Camera_Init(&play->subCameras[i], &play->view, &play->colCtx, play);

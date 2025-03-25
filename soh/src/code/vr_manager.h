@@ -6,7 +6,7 @@ extern "C" {
 #endif
 
 // Function to pause execution until user presses Enter
-int halt(void);
+int vr_main(void);
 
 #ifdef __cplusplus
 }
