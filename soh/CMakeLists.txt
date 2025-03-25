@@ -172,7 +172,7 @@ endif()
 # }}}
 
 # src (decomp) {{{
-file(GLOB_RECURSE src__ RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "src/*.c" "src/*.h")
+file(GLOB_RECURSE src__ RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "src/*.c" "src/*.cpp" "src/*.h")
 set_source_files_properties(${src__} PROPERTIES COMPILE_OPTIONS "${WARNING_OVERRIDE}")
 
 list(APPEND src__ ${CMAKE_CURRENT_SOURCE_DIR}/Resource.rc)
@@ -300,6 +300,27 @@ else()
     message("Boost found in " ${Boost_INCLUDE_DIRS})
     set(BOOST-INCLUDE ${Boost_INCLUDE_DIRS})
 endif()
+
+################################################################################
+# OpenVR Configuration
+################################################################################
+set(OPENVR_ROOT_DIR "C:/Users/aj12a/programming/openvr-2.5.1" CACHE PATH "Path to OpenVR root directory")
+set(OPENVR_INCLUDE_DIR "${OPENVR_ROOT_DIR}/headers")
+if("${CMAKE_VS_PLATFORM_NAME}" STREQUAL "x64")
+    set(OPENVR_PLATFORM_PATH "win64")
+else()
+    set(OPENVR_PLATFORM_PATH "win32")
+endif()
+set(OPENVR_LIBRARY "${OPENVR_ROOT_DIR}/lib/${OPENVR_PLATFORM_PATH}/openvr_api.lib")
+
+if(NOT EXISTS "${OPENVR_INCLUDE_DIR}/openvr.h")
+    message(FATAL_ERROR "Could not find OpenVR headers at ${OPENVR_INCLUDE_DIR}")
+endif()
+
+if(NOT EXISTS "${OPENVR_LIBRARY}")
+    message(FATAL_ERROR "Could not find OpenVR library at ${OPENVR_LIBRARY}")
+endif()
+
 ################################################################################
 # Compile definitions
 ################################################################################
@@ -349,6 +370,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE assets
 	${SDL2-INCLUDE}
     ${SDL2-NET-INCLUDE}
     ${BOOST-INCLUDE}
+    ${OPENVR_INCLUDE_DIR}
 	${CMAKE_CURRENT_SOURCE_DIR}/assets/
 	.
 )
@@ -372,6 +394,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
 			STORMLIB_NO_AUTO_LINK
 			"_CRT_SECURE_NO_WARNINGS;"
             NOMINMAX
+            "ENABLE_OPENVR"
 		)
 	elseif("${CMAKE_VS_PLATFORM_NAME}" STREQUAL "Win32")
 		target_compile_definitions(${PROJECT_NAME} PRIVATE
@@ -652,7 +675,8 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
 			"winmm;"
 			"imm32;"
 			"version;"
-			"setupapi"
+			"setupapi;"
+            "${OPENVR_LIBRARY}"
 		)
 	elseif("${CMAKE_VS_PLATFORM_NAME}" STREQUAL "Win32")
 		set(ADDITIONAL_LIBRARY_DEPENDENCIES
