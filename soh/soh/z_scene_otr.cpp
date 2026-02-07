@@ -13,6 +13,10 @@
 #include <ship/resource/type/Blob.h>
 #include <memory>
 #include <cassert>
+
+#ifdef ENABLE_DX12_RTX
+#include "Enhancements/RTX/RTXHooks.h"
+#endif
 #include "soh/resource/type/scenecommand/SetCameraSettings.h"
 #include "soh/resource/type/scenecommand/SetCutscenes.h"
 #include "soh/resource/type/scenecommand/SetStartPositionList.h"
@@ -477,6 +481,15 @@ extern "C" s32 OTRfunc_800973FC(PlayState* play, RoomContext* roomCtx) {
             Actor_SpawnTransitionActors(play, &play->actorCtx);
 
             GameInteractor_ExecuteAfterSceneCommands(play->sceneNum);
+
+#ifdef ENABLE_DX12_RTX
+            // Notify RTX renderer that a room has finished loading.
+            // This triggers geometry extraction and BLAS building for RTX-enabled scenes.
+            // RTX_IsKokiriForest checks RTXSceneConfig to determine if RTX is enabled for this scene.
+            if (RTX_IsKokiriForest(play)) {
+                RTX_OnRoomLoaded(play, roomCtx->curRoom.num);
+            }
+#endif
 
             return 1;
         }

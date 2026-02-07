@@ -495,6 +495,13 @@ static void RunFrame() {
 
             Graph_ProcessGfxCommands(runFrameContext.gfxCtx.workBuffer);
 
+#ifdef ENABLE_DX12_RTX
+            // NOTE: RTX rendering is handled inside Graph_ProcessGfxCommands()
+            // (defined in OTRGlobals.cpp). When RTX is active, it calls
+            // RTX_DispatchAndPresent() instead of the standard Fast3D path.
+            // No additional hooks are needed here.
+#endif
+
             // uint64_t diff = (ticksB - ticksA) / (freq / 1000);
             // printf("Frame simulated in %ims\n", diff);
             runFrameContext.state = 1;

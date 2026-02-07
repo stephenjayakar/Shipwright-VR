@@ -1561,6 +1561,12 @@ extern "C" void DeinitOTR() {
     SDLNet_Quit();
 #endif
 
+#ifdef ENABLE_DX12_RTX
+    // Shut down the RTX renderer before destroying the window.
+    // This releases DX12 device, swap chain, acceleration structures, etc.
+    RTX_Shutdown();
+#endif
+
     // Destroying gui here because we have shared ptrs to LUS objects which output to SPDLOG which is destroyed before
     // these shared ptrs.
     SohGui::Destroy();
@@ -1735,6 +1741,14 @@ extern "C" void Graph_ProcessGfxCommands(Gfx* commands) {
     }
 
     audio.cv_to_thread.notify_one();
+
+#ifdef ENABLE_DX12_RTX
+    // RTX path: dispatch rays and present via DX12, skip Fast3D rendering.
+    if (RTX_IsActive()) {
+        RTX_DispatchAndPresent();
+    } else {
+#endif
+
     std::vector<std::unordered_map<Mtx*, MtxF>> mtx_replacements;
     int target_fps = OTRGlobals::Instance->GetInterpolationFPS();
     static int last_fps;
@@ -1780,6 +1794,10 @@ extern "C" void Graph_ProcessGfxCommands(Gfx* commands) {
 
     last_fps = fps;
     last_update_rate = R_UPDATE_RATE;
+
+#ifdef ENABLE_DX12_RTX
+    } // end else (non-RTX path)
+#endif
 
     {
         std::unique_lock<std::mutex> Lock(audio.mutex);

@@ -8,14 +8,14 @@
 | Phase | Status | Notes |
 |-------|--------|-------|
 | Phase 1: DX12 + DXR Foundation | **DONE** | DX12Device.h/cpp, DXRPipeline.h/cpp fully implemented |
-| Phase 2: Geometry Extraction | TODO | SceneGeometryExtractor not yet implemented |
-| Phase 3: Acceleration Structures | TODO | AccelerationStructure not yet implemented |
+| Phase 2: Geometry Extraction | **DONE** | SceneGeometryExtractor.h/cpp fully implemented |
+| Phase 3: Acceleration Structures | **DONE** | AccelerationStructure.h/cpp fully implemented |
 | Phase 4: HLSL Shaders | **DONE** | All 6 shaders: Common.hlsli, RayGen, ClosestHit, Miss, AnyHit, Denoise |
 | Phase 5: Global Illumination | **DONE** | 1-bounce diffuse path tracing in ClosestHit.hlsl + temporal accumulation in RayGen.hlsl |
-| Phase 6: Texture Management | TODO | TextureManager not yet implemented |
+| Phase 6: Texture Management | **DONE** | TextureManager.h/cpp fully implemented |
 | Phase 7: Scene Integration Hooks | **DONE** | RTXHooks.h/cpp + RTXRenderer.h/cpp orchestrator |
 | Phase 8: Kokiri Forest Specifics | **DONE** (partial) | Fog/alpha/water scroll logic in RTXRenderer + shaders; full display list specifics need Phase 2 |
-| Phase 9: Build System Integration | TODO | CMake changes not yet applied |
+| Phase 9: Build System Integration | **DONE** | CMake: ENABLE_DX12_RTX option, DXC shader compilation, source listing, link libs, preprocessor guards |
 
 ---
 
@@ -1449,8 +1449,8 @@ soh/soh/Enhancements/rtx/
 1. ~~**Initialize submodules** - Get the project building~~
 2. ~~**DX12Device** - Get a DX12 device + swap chain working, present a solid color~~ **DONE**
 3. ~~**DXRPipeline** - Create state object, verify DXR support, dispatch empty rays~~ **DONE**
-4. **SceneGeometryExtractor** - Extract geometry from one room display list
-5. **AccelerationStructure** - Build BLAS from extracted geometry, verify structure
+4. ~~**SceneGeometryExtractor** - Extract geometry from one room display list~~ **DONE**
+5. ~~**AccelerationStructure** - Build BLAS from extracted geometry, verify structure~~ **DONE**
 6. ~~**Shaders (basic)** - RayGen + ClosestHit (no textures, flat color) + Miss~~ **DONE**
 7. **TextureManager** - Decode and upload textures, bind to SRV heap
 8. ~~**Shaders (textured)** - Add texture sampling and combiner logic~~ **DONE**

@@ -1,3 +1,4 @@
+#pragma once
 #ifndef DX12_DEVICE_H
 #define DX12_DEVICE_H
 
@@ -48,6 +49,7 @@ public:
 
     uint32_t GetSRVDescriptorSize() const { return m_srvDescriptorSize; }
     uint32_t GetRTVDescriptorSize() const { return m_rtvDescriptorSize; }
+    uint32_t GetUAVDescriptorSize() const { return m_uavDescriptorSize; }
 
     uint32_t GetWidth() const { return m_width; }
     uint32_t GetHeight() const { return m_height; }
@@ -89,6 +91,7 @@ private:
     ComPtr<ID3D12DescriptorHeap> m_uavHeap;   // Unordered access views (16, shader-visible)
     uint32_t m_rtvDescriptorSize = 0;
     uint32_t m_srvDescriptorSize = 0;
+    uint32_t m_uavDescriptorSize = 0;
 
     // Synchronization
     ComPtr<ID3D12Fence> m_fence;

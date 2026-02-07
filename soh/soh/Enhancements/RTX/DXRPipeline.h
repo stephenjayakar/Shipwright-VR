@@ -1,3 +1,4 @@
+#pragma once
 #ifndef DXR_PIPELINE_H
 #define DXR_PIPELINE_H
 
@@ -5,6 +6,7 @@
 
 #include "DX12Device.h"
 #include "RTXTypes.h"
+#include "RTXShaderCompiler.h"
 #include <d3d12.h>
 #include <dxcapi.h>
 #include <wrl/client.h>
@@ -27,10 +29,19 @@ public:
     bool CreateOutputBuffers(uint32_t width, uint32_t height);
 
     // Dispatch rays
-    void DispatchRays(ID3D12GraphicsCommandList4* commandList, uint32_t width, uint32_t height);
+    // textureTableGPU: GPU descriptor handle for the start of the bindless texture
+    //   SRV table (from TextureManager). If ptr==0, no texture table is bound.
+    void DispatchRays(ID3D12GraphicsCommandList4* commandList, uint32_t width, uint32_t height,
+                      D3D12_GPU_VIRTUAL_ADDRESS tlasAddress = 0,
+                      D3D12_GPU_DESCRIPTOR_HANDLE textureTableGPU = {});
 
-    // Dispatch denoise compute shader
+    // Dispatch denoise compute shader (uses default denoise constants)
     void DispatchDenoise(ID3D12GraphicsCommandList4* commandList, uint32_t width, uint32_t height, int pass);
+
+    // Dispatch denoise compute shader with explicit constants from GISystem.
+    // passIndex is used for ping-pong buffer selection (0, 1, 2, ...).
+    void DispatchDenoise(ID3D12GraphicsCommandList4* commandList, uint32_t width, uint32_t height,
+                         int passIndex, const DenoiseConstants& constants);
 
     // Update scene constants
     void UpdateSceneConstants(const SceneConstants& constants);
@@ -39,8 +50,19 @@ public:
     ID3D12StateObject* GetStateObject() const { return m_stateObject.Get(); }
     ID3D12RootSignature* GetGlobalRootSignature() const { return m_globalRootSignature.Get(); }
     ID3D12Resource* GetOutputBuffer() const { return m_outputBuffer.Get(); }
+    ID3D12Resource* GetDenoiseTempBuffer() const { return m_denoiseTempBuffer.Get(); }
     ID3D12Resource* GetAccumulationBuffer() const { return m_accumulationBuffer.Get(); }
     ID3D12Resource* GetConstantBuffer() const { return m_constantBuffer.Get(); }
+    D3D12_GPU_DESCRIPTOR_HANDLE GetOutputUAV() const;
+
+    // After N denoise passes with ping-pong, returns the buffer containing
+    // the final denoised result. For odd N, result is in temp buffer;
+    // for even N (or 0), result is in output buffer.
+    ID3D12Resource* GetFinalDenoisedBuffer(int totalPasses) const {
+        return (totalPasses > 0 && totalPasses % 2 != 0)
+            ? m_denoiseTempBuffer.Get()
+            : m_outputBuffer.Get();
+    }
 
 private:
     // Pipeline creation
@@ -51,9 +73,8 @@ private:
     bool CreateConstantBuffer();
     bool CreateDenoiseComputePipeline();
 
-    // Shader compilation
-    ComPtr<IDxcBlob> CompileShader(const std::wstring& filePath, const wchar_t* entryPoint, const wchar_t* target);
-    bool LoadPrecompiledShader(const std::wstring& filePath, ComPtr<IDxcBlob>& blob);
+    // Shader loading (uses RTXShaderCompiler)
+    bool LoadShaders();
 
     // Device reference (not owned)
     DX12Device* m_device = nullptr;
@@ -82,14 +103,23 @@ private:
     ComPtr<ID3D12Resource> m_outputBuffer;         // RWTexture2D<float4> for ray tracing output
     ComPtr<ID3D12Resource> m_accumulationBuffer;   // RWTexture2D<float4> for temporal accumulation
     ComPtr<ID3D12Resource> m_denoiseTempBuffer;    // Temp buffer for denoise ping-pong
+    
+    // UAV descriptor handles (stored for GetOutputUAV)
+    D3D12_GPU_DESCRIPTOR_HANDLE m_outputBufferUAV;
+    D3D12_GPU_DESCRIPTOR_HANDLE m_accumulationBufferUAV;
+    D3D12_GPU_DESCRIPTOR_HANDLE m_denoiseTempBufferUAV;
+    bool m_uavDescriptorsCreated = false;
 
     // Scene constant buffer (per-frame, CPU-visible upload heap)
     ComPtr<ID3D12Resource> m_constantBuffer;
     void* m_constantBufferMapped = nullptr;
 
-    // Shader compiler
-    ComPtr<IDxcLibrary> m_dxcLibrary;
-    ComPtr<IDxcCompiler> m_dxcCompiler;
+    // Compiled shader blobs (loaded by RTXShaderCompiler)
+    ComPtr<IDxcBlob> m_rayGenBlob;
+    ComPtr<IDxcBlob> m_closestHitBlob;
+    ComPtr<IDxcBlob> m_missBlob;
+    ComPtr<IDxcBlob> m_anyHitBlob;
+    ComPtr<IDxcBlob> m_denoiseBlob;
 
     // Root parameter indices (global root signature)
     enum GlobalRootParam {

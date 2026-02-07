@@ -216,6 +216,8 @@ bool DX12Device::CreateDescriptorHeaps() {
             SPDLOG_ERROR("[RTX] Failed to create UAV heap: 0x{:08X}", (uint32_t)hr);
             return false;
         }
+
+        m_uavDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
     }
 
     return true;

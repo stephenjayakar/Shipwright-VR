@@ -1,3 +1,4 @@
+#pragma once
 #ifndef RTX_HOOKS_H
 #define RTX_HOOKS_H
 
@@ -29,6 +30,10 @@ void RTX_DispatchAndPresent(void);
 // Triggers geometry extraction and BLAS building.
 void RTX_OnRoomLoaded(void* play, int roomNum);
 
+// Called when a new scene is loaded (before room loading begins).
+// Initializes RTX state for the scene if it's an RTX-enabled scene.
+void RTX_OnSceneLoaded(int sceneNum);
+
 // Called when leaving a scene.
 // Releases acceleration structures, textures, and GPU buffers.
 void RTX_OnSceneUnload(void);
@@ -42,6 +47,15 @@ int RTX_Initialize(void* hwnd, unsigned int width, unsigned int height);
 // Shut down the RTX renderer.
 void RTX_Shutdown(void);
 
+// Intercept a decoded N64 texture and upload it to the RTX texture manager.
+// Called from the texture decode path when RTX is active.
+// timgAddr: original N64 timg pointer/address (used for hash computation)
+// rgbaData: decoded RGBA8 pixel data (width * height * 4 bytes)
+// width/height: texture dimensions in texels
+// format: packed N64 format ((G_IM_FMT << 4) | G_IM_SIZ)
+void RTX_InterceptTexture(const void* timgAddr, const unsigned char* rgbaData,
+                          unsigned int width, unsigned int height, unsigned int format);
+
 #else
 
 // No-op stubs when RTX is not enabled
@@ -50,9 +64,14 @@ static inline int RTX_IsKokiriForest(void* play) { (void)play; return 0; }
 static inline void RTX_UpdateSceneParams(void* play) { (void)play; }
 static inline void RTX_DispatchAndPresent(void) {}
 static inline void RTX_OnRoomLoaded(void* play, int roomNum) { (void)play; (void)roomNum; }
+static inline void RTX_OnSceneLoaded(int sceneNum) { (void)sceneNum; }
 static inline void RTX_OnSceneUnload(void) {}
 static inline int RTX_Initialize(void* hwnd, unsigned int width, unsigned int height) { (void)hwnd; (void)width; (void)height; return 0; }
 static inline void RTX_Shutdown(void) {}
+static inline void RTX_InterceptTexture(const void* timgAddr, const unsigned char* rgbaData,
+                                        unsigned int width, unsigned int height, unsigned int format) {
+    (void)timgAddr; (void)rgbaData; (void)width; (void)height; (void)format;
+}
 
 #endif // ENABLE_DX12_RTX
 

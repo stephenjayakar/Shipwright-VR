@@ -9,6 +9,7 @@
 
 // --- Scene Constants (matches RTX::SceneConstants in RTXTypes.h) ---
 struct SceneConstants {
+    // Core camera and lighting
     float4x4 viewInverse;        // Camera view matrix inverse
     float4x4 projInverse;        // Camera projection matrix inverse
     float3   cameraPos;          // World-space camera position
@@ -25,6 +26,16 @@ struct SceneConstants {
     float    fogBlendAlpha;      // Atmosphere blending (segment 0x0B)
     float3   sunColor2;          // Directional light 2 color
     float    waterScrollOffset;  // For segment 0x0C stream
+
+    // Per-scene material overrides from RTXSceneConfig
+    float    giIntensity;        // GI contribution multiplier [0, 2]
+    float    baseReflectivity;   // Scene-wide base reflectivity [0, 1]
+    float    roughnessScale;     // Surface roughness multiplier [0, 2]
+    float    emissiveScale;      // Emissive surface multiplier [0, 5]
+    float    waterReflectivity;  // Water surface reflectivity [0, 1]
+    float    waterRoughness;     // Water surface roughness [0, 1]
+    float    aoRadius;           // AO sample radius (world units)
+    float    aoIntensity;        // AO darkening intensity [0, 2]
 };
 
 // --- Ray Payload ---

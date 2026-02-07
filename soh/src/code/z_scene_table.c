@@ -27,6 +27,10 @@
 #include "soh/OTRGlobals.h"
 #include "soh/ResourceManagerHelpers.h"
 
+#ifdef ENABLE_DX12_RTX
+#include "soh/Enhancements/RTX/RTXHooks.h"
+#endif
+
 // Entrance Table definition
 #define DEFINE_ENTRANCE(_0, sceneId, spawn, continueBgm, displayTitleCard, endTransType, startTransType) \
     { sceneId, spawn,                                                                                    \
@@ -1106,8 +1110,17 @@ void func_8009DE78(PlayState* play) {
     CLOSE_DISPS(play->state.gfxCtx);
 }
 
-// Scene Draw Config 4
+// Scene Draw Config 4 - Kokiri Forest
 void func_8009E0B8(PlayState* play) {
+#ifdef ENABLE_DX12_RTX
+    // RTX hook: if RTX renderer is active and this is Kokiri Forest,
+    // extract scene parameters for the RTX renderer and skip GBI commands.
+    if (RTX_IsActive() && RTX_IsKokiriForest(play)) {
+        RTX_UpdateSceneParams(play);
+        return;
+    }
+#endif
+
     u32 gameplayFrames;
     u8 spA3;
     u16 spA0;

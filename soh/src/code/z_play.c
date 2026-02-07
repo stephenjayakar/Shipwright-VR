@@ -16,6 +16,10 @@
 #include "soh/SaveManager.h"
 #include "soh/framebuffer_effects.h"
 
+#ifdef ENABLE_DX12_RTX
+#include "soh/Enhancements/RTX/RTXHooks.h"
+#endif
+
 #include <libultraship/libultraship.h>
 
 #include <time.h>
@@ -243,6 +247,12 @@ void Play_Destroy(GameState* thisx) {
     ZeldaArena_Cleanup();
 
     Fault_RemoveClient(&D_801614B8);
+
+#ifdef ENABLE_DX12_RTX
+    // Notify RTX renderer that the scene is being unloaded.
+    // This releases acceleration structures, textures, and GPU buffers.
+    RTX_OnSceneUnload();
+#endif
 
     disableBetaQuest();
 
@@ -1547,8 +1557,16 @@ void Play_Draw(PlayState* play) {
                     roomDrawFlags = HREG(84);
                 }
                 Scene_Draw(play);
+#ifdef ENABLE_DX12_RTX
+                // When RTX is active, room geometry is rendered via ray tracing.
+                // Skip the normal Room_Draw calls to avoid double rendering.
+                if (!RTX_IsActive()) {
+#endif
                 Room_Draw(play, &play->roomCtx.curRoom, roomDrawFlags & 3);
                 Room_Draw(play, &play->roomCtx.prevRoom, roomDrawFlags & 3);
+#ifdef ENABLE_DX12_RTX
+                }
+#endif
             }
         }
 

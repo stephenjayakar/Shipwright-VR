@@ -8,6 +8,10 @@
 #include "vt.h"
 #include <fast/resource/type/Vertex.h>
 
+#ifdef ENABLE_DX12_RTX
+#include "Enhancements/RTX/RTXHooks.h"
+#endif
+
 extern "C" void Play_InitScene(PlayState* play, s32 spawn);
 extern "C" void Play_InitEnvironment(PlayState* play, s16 skyboxId);
 void OTRPlay_InitScene(PlayState* play, s32 spawn);
@@ -60,6 +64,13 @@ extern "C" void OTRPlay_SpawnScene(PlayState* play, s32 sceneId, s32 spawn) {
     osSyncPrintf("ROOM SIZE=%fK\n", roomSize / 1024.0f);
 
     GameInteractor_ExecuteOnSceneInit(play->sceneNum);
+
+#ifdef ENABLE_DX12_RTX
+    // Notify RTX renderer that a new scene has been loaded.
+    // This initializes RTX state for RTX-enabled scenes (e.g., Kokiri Forest).
+    RTX_OnSceneLoaded(play->sceneNum);
+#endif
+
     SPDLOG_INFO("Scene Init - sceneNum: {0:#x}, entranceIndex: {1:#x}", play->sceneNum, gSaveContext.entranceIndex);
 }
 

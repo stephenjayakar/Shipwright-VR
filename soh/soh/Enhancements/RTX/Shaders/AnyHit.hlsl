@@ -12,8 +12,8 @@ StructuredBuffer<uint>       g_indices     : register(t1, space1);
 StructuredBuffer<uint>       g_materialIDs : register(t2, space1);
 StructuredBuffer<Material>   g_materials   : register(t3, space1);
 
-// Bindless texture array
-Texture2D    g_textures[] : register(t4, space1);
+// Bindless texture array (global root signature, space0)
+Texture2D    g_textures[] : register(t4, space0);
 SamplerState g_sampler    : register(s0);
 
 ConstantBuffer<SceneConstants> g_constants : register(b0);

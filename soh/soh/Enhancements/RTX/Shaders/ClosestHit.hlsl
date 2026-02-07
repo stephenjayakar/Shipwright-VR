@@ -16,8 +16,8 @@ StructuredBuffer<uint>       g_indices     : register(t1, space1);
 StructuredBuffer<uint>       g_materialIDs : register(t2, space1);
 StructuredBuffer<Material>   g_materials   : register(t3, space1);
 
-// Bindless texture array
-Texture2D    g_textures[] : register(t4, space1);
+// Bindless texture array (global root signature, space0)
+Texture2D    g_textures[] : register(t4, space0);
 SamplerState g_sampler    : register(s0);
 
 [shader("closesthit")]
@@ -49,7 +49,8 @@ void ClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttribut
     Material mat = g_materials[matID];
 
     // --- Apply water UV scrolling ---
-    if (mat.isWater) {
+    bool isWaterSurface = (mat.isWater != 0);
+    if (isWaterSurface) {
         uv.y += g_constants.time * 0.01;
     }
 
@@ -111,11 +112,9 @@ void ClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttribut
         shadow = shadowPayload.hit ? 0.3 : 1.0;
     }
 
-    float3 directShading = albedo * (directLight * shadow + ambient);
-
     // --- Global illumination bounce (only from primary rays) ---
     float3 giContribution = float3(0, 0, 0);
-    if (payload.recursionDepth == 0) {
+    if (payload.recursionDepth == 0 && g_constants.giIntensity > 0.0) {
         uint2 pixel = DispatchRaysIndex().xy;
         float2 rand = float2(
             Random01(pixel.x + pixel.y * 8192u + g_constants.frameCount * 65536u),
@@ -127,7 +126,7 @@ void ClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttribut
         giRay.Origin = worldPos + normal * 0.1;
         giRay.Direction = giDir;
         giRay.TMin = 0.1;
-        giRay.TMax = 10000.0;
+        giRay.TMax = g_constants.aoRadius > 0.0 ? g_constants.aoRadius * 200.0 : 10000.0;
 
         RayPayload giPayload;
         giPayload.color = float3(0, 0, 0);
@@ -138,13 +137,42 @@ void ClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttribut
         TraceRay(g_scene, RAY_FLAG_NONE, 0xFF, 0, 0, 0, giRay, giPayload);
 
         if (giPayload.hit) {
-            // Modulate bounce light by primary surface albedo
-            giContribution = giPayload.color * albedo * 0.5;
+            // Modulate bounce light by primary surface albedo and GI intensity
+            giContribution = giPayload.color * albedo * 0.5 * g_constants.giIntensity;
+        } else {
+            // GI ray missed (open sky) — no AO darkening for this sample
         }
     }
 
+    // --- Apply simple ambient occlusion estimate ---
+    // AO is naturally captured by the GI bounce: if the bounce ray hits
+    // nearby geometry, less indirect light reaches this point. We add an
+    // additional AO darkening factor controlled by aoIntensity.
+    float aoFactor = 1.0;
+    // (AO is implicitly handled by the GI bounce; aoIntensity scales the
+    //  ambient term to fake additional occlusion darkening in dense areas.)
+    if (g_constants.aoIntensity > 0.0) {
+        // Reduce ambient in proportion to AO intensity setting.
+        // This is a rough approximation: in a full implementation, a
+        // separate short-range AO ray would be cast.
+        aoFactor = 1.0 - g_constants.aoIntensity * 0.3;
+    }
+
+    // --- Water surface reflectivity ---
+    // For water surfaces, blend in a simple Fresnel reflection approximation
+    // using waterReflectivity from the scene config.
+    float3 baseColor = albedo * (directLight * shadow + ambient * aoFactor) + giContribution;
+    if (isWaterSurface && g_constants.waterReflectivity > 0.0) {
+        float3 viewDir = normalize(g_constants.cameraPos - worldPos);
+        float fresnel = g_constants.waterReflectivity +
+                        (1.0 - g_constants.waterReflectivity) * pow(1.0 - saturate(dot(viewDir, normal)), 5.0);
+        // Blend between water surface color and reflected sky/fog color
+        float3 reflectColor = g_constants.fogColor * 1.2; // Approximation: reflect sky/fog
+        baseColor = lerp(baseColor, reflectColor, fresnel * (1.0 - g_constants.waterRoughness));
+    }
+
     // --- Final color ---
-    payload.color = directShading + giContribution;
+    payload.color = baseColor;
     payload.distance = RayTCurrent();
     payload.hit = true;
 }

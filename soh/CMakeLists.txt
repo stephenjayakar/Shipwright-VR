@@ -100,6 +100,15 @@ endif()
 set(PROJECT_NAME soh)
 
 ################################################################################
+# RTX Option (Windows x64 only)
+################################################################################
+if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND "${CMAKE_VS_PLATFORM_NAME}" STREQUAL "x64")
+    option(ENABLE_DX12_RTX "Enable DirectX 12 RTX raytracing for Kokiri Forest" OFF)
+else()
+    set(ENABLE_DX12_RTX OFF CACHE BOOL "Enable DirectX 12 RTX raytracing (Windows x64 only)" FORCE)
+endif()
+
+################################################################################
 # Sources
 ################################################################################
 configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/src/boot/build.c.in ${CMAKE_CURRENT_SOURCE_DIR}/src/boot/build.c @ONLY)
@@ -159,6 +168,30 @@ endif()
 find_library(ESPEAK espeak-ng)
 if (NOT ESPEAK)
     list(FILTER soh__ EXCLUDE REGEX "soh/Enhancements/speechsynthesizer/ESpeak")
+endif()
+
+# handle RTX removals (Windows x64 + DX12 RTX only)
+# When ENABLE_DX12_RTX is ON, the following RTX source files are included via GLOB_RECURSE:
+#   soh/Enhancements/RTX/DX12Context.cpp         - DX12 context management
+#   soh/Enhancements/RTX/DX12Device.cpp          - DX12 device, swap chain, command queue
+#   soh/Enhancements/RTX/DX12Renderer.cpp        - Low-level DX12 rendering utilities
+#   soh/Enhancements/RTX/DXRPipeline.cpp         - State object, root signatures, shader tables
+#   soh/Enhancements/RTX/RTXManager.cpp           - High-level RTX subsystem manager
+#   soh/Enhancements/RTX/RTXPipeline.cpp          - RTX pipeline configuration
+#   soh/Enhancements/RTX/RTXRenderer.cpp          - Main RTX rendering orchestrator
+#   soh/Enhancements/RTX/RTXSceneManager.cpp      - Scene lifecycle management for RTX
+#   soh/Enhancements/RTX/TextureManager.cpp       - N64 texture extraction and DX12 upload
+#   soh/Enhancements/RTX/RTXSceneConfig.cpp       - Kokiri Forest scene-specific RT configuration
+#   soh/Enhancements/RTX/GISystem.cpp             - Global illumination system
+#   soh/Enhancements/RTX/AccelerationStructure.cpp - BLAS/TLAS management
+#   soh/Enhancements/RTX/RTAccelStructure.cpp     - RT acceleration structure utilities
+#   soh/Enhancements/RTX/SceneAdapter.cpp         - Scene data adapter
+#   soh/Enhancements/RTX/SceneConverter.cpp        - Scene conversion utilities
+#   soh/Enhancements/RTX/SceneGeometryExtractor.cpp - N64 display list geometry extraction
+#   soh/Enhancements/RTX/RTXHooks.cpp             - Integration hooks into game rendering
+#   soh/Enhancements/RTX/RTXShaderCompiler.cpp    - Runtime shader compilation
+if (NOT ENABLE_DX12_RTX)
+    list(FILTER soh__ EXCLUDE REGEX "soh/Enhancements/RTX/")
 endif()
 
 # soh/Extractor {{{
@@ -342,6 +375,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
             "$<$<BOOL:${BUILD_REMOTE_CONTROL}>:ENABLE_REMOTE_CONTROL>"
 			"INCLUDE_GAME_PRINTF;"
             "F3DEX_GBI_2"
+			"$<$<BOOL:${ENABLE_DX12_RTX}>:ENABLE_DX12_RTX=1>"
 			"UNICODE;"
 			"_UNICODE"
             SPDLOG_ACTIVE_LEVEL=${SPDLOG_MIN_CUTOFF}
@@ -624,6 +658,310 @@ add_dependencies(${PROJECT_NAME}
 )
 endif()
 
+################################################################################
+# RTX Build System Integration (Phase 9)
+# All RTX build integration is gated on both ENABLE_DX12_RTX and WIN32 so that
+# non-Windows builds are never affected.
+################################################################################
+if (ENABLE_DX12_RTX AND CMAKE_SYSTEM_NAME STREQUAL "Windows")
+
+    # ==========================================================================
+    # 1. RTX SOURCE FILE LISTING
+    # ==========================================================================
+    # All RTX .cpp and .h files are collected into the RTX_SOURCES variable and
+    # conditionally appended to the soh target via target_sources().
+    # Note: GLOB_RECURSE at the top of this file also picks up .cpp/.h from
+    # soh/Enhancements/RTX/ when ENABLE_DX12_RTX is ON (the filter on line ~184
+    # only excludes them when OFF). CMake deduplicates, so explicit listing here
+    # is safe and ensures completeness + IDE visibility.
+    # ==========================================================================
+    set(RTX_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/soh/Enhancements/RTX)
+    set(RTX_SHADER_DIR ${RTX_SOURCE_DIR}/Shaders)
+
+    set(RTX_SOURCES
+        # --- Headers ---
+        ${RTX_SOURCE_DIR}/RTXTypes.h
+        ${RTX_SOURCE_DIR}/DX12Context.h
+        ${RTX_SOURCE_DIR}/DX12Device.h
+        ${RTX_SOURCE_DIR}/DX12Renderer.h
+        ${RTX_SOURCE_DIR}/RTXPipeline.h
+        ${RTX_SOURCE_DIR}/DXRPipeline.h
+        ${RTX_SOURCE_DIR}/RTAccelStructure.h
+        ${RTX_SOURCE_DIR}/AccelerationStructure.h
+        ${RTX_SOURCE_DIR}/RTXManager.h
+        ${RTX_SOURCE_DIR}/RTXRenderer.h
+        ${RTX_SOURCE_DIR}/RTXSceneManager.h
+        ${RTX_SOURCE_DIR}/SceneAdapter.h
+        ${RTX_SOURCE_DIR}/SceneGeometryExtractor.h
+        ${RTX_SOURCE_DIR}/TextureManager.h
+        ${RTX_SOURCE_DIR}/GISystem.h
+        ${RTX_SOURCE_DIR}/RTXSceneConfig.h
+        ${RTX_SOURCE_DIR}/RTXHooks.h
+        ${RTX_SOURCE_DIR}/RTXShaderCompiler.h
+        # --- Source files (Phase 9: complete RTX source listing) ---
+        ${RTX_SOURCE_DIR}/DX12Context.cpp
+        ${RTX_SOURCE_DIR}/DX12Device.cpp
+        ${RTX_SOURCE_DIR}/DX12Renderer.cpp
+        ${RTX_SOURCE_DIR}/RTXPipeline.cpp
+        ${RTX_SOURCE_DIR}/DXRPipeline.cpp
+        ${RTX_SOURCE_DIR}/RTAccelStructure.cpp
+        ${RTX_SOURCE_DIR}/AccelerationStructure.cpp
+        ${RTX_SOURCE_DIR}/RTXManager.cpp
+        ${RTX_SOURCE_DIR}/RTXRenderer.cpp
+        ${RTX_SOURCE_DIR}/RTXSceneManager.cpp
+        ${RTX_SOURCE_DIR}/SceneAdapter.cpp
+        ${RTX_SOURCE_DIR}/SceneConverter.cpp
+        ${RTX_SOURCE_DIR}/SceneGeometryExtractor.cpp
+        ${RTX_SOURCE_DIR}/TextureManager.cpp
+        ${RTX_SOURCE_DIR}/GISystem.cpp
+        ${RTX_SOURCE_DIR}/RTXSceneConfig.cpp
+        ${RTX_SOURCE_DIR}/RTXHooks.cpp
+        ${RTX_SOURCE_DIR}/RTXShaderCompiler.cpp
+    )
+
+    # RTX HLSL shader source files (not compiled as C++, tracked for IDE integration)
+    set(RTX_SHADER_SOURCES
+        ${RTX_SHADER_DIR}/Common.hlsli
+        ${RTX_SHADER_DIR}/RayGen.hlsl
+        ${RTX_SHADER_DIR}/ClosestHit.hlsl
+        ${RTX_SHADER_DIR}/Miss.hlsl
+        ${RTX_SHADER_DIR}/AnyHit.hlsl
+        ${RTX_SHADER_DIR}/Denoise.hlsl
+        ${RTX_SHADER_DIR}/RTXGlobalIllumination.hlsl
+        ${RTX_SHADER_DIR}/RTXRaytracing.hlsl
+    )
+    if (EXISTS ${RTX_SHADER_DIR}/Accumulate.hlsl)
+        list(APPEND RTX_SHADER_SOURCES ${RTX_SHADER_DIR}/Accumulate.hlsl)
+    endif()
+
+    # Mark HLSL files as non-compiled so the C++ compiler doesn't process them
+    set_source_files_properties(${RTX_SHADER_SOURCES} PROPERTIES HEADER_FILE_ONLY TRUE)
+
+    # Conditionally append RTX sources to the soh target
+    target_sources(${PROJECT_NAME} PRIVATE
+        ${RTX_SOURCES}
+        ${RTX_SHADER_SOURCES}
+    )
+
+    # Ensure the RTX include directory is accessible
+    target_include_directories(${PROJECT_NAME} PRIVATE
+        ${RTX_SOURCE_DIR}
+    )
+
+    # Create source groups for IDE organization (Visual Studio filters)
+    source_group("soh\\Enhancements\\RTX" FILES ${RTX_SOURCES})
+    source_group("soh\\Enhancements\\RTX\\Shaders" FILES ${RTX_SHADER_SOURCES})
+
+    # ==========================================================================
+    # 2. SHADER COMPILATION RULES (DXC)
+    # ==========================================================================
+    # Compile HLSL shaders using DXC (DirectX Shader Compiler).
+    # Raytracing shaders use -T lib_6_3 target profile for DXR.
+    # Compute shaders use -T cs_6_0.
+    # Output compiled shaders (.cso) to ${CMAKE_BINARY_DIR}/shaders/
+    # ==========================================================================
+    set(RTX_SHADER_OUTPUT_DIR ${CMAKE_BINARY_DIR}/shaders)
+    file(MAKE_DIRECTORY ${RTX_SHADER_OUTPUT_DIR})
+
+    # Find DXC (DirectX Shader Compiler)
+    find_program(DXC dxc
+        HINTS
+            "$ENV{VULKAN_SDK}/Bin"
+            "C:/Program Files (x86)/Windows Kits/10/bin/10.0.22621.0/x64"
+            "C:/Program Files (x86)/Windows Kits/10/bin/10.0.20348.0/x64"
+            "C:/Program Files (x86)/Windows Kits/10/bin/10.0.19041.0/x64"
+            "${CMAKE_WINDOWS_KITS_10_DIR}/bin/${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}/x64"
+            "$ENV{WindowsSdkDir}/bin/${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}/x64"
+            "$ENV{WindowsSdkDir}/bin/x64"
+        DOC "Path to the DXC (DirectX Shader Compiler) executable"
+    )
+
+    # Compiled shader output files list (for dependency tracking)
+    set(RTX_COMPILED_SHADERS "")
+
+    if (DXC)
+        message(STATUS "Found DXC shader compiler: ${DXC}")
+
+        # -- Raytracing shaders: compiled as DXIL libraries (lib_6_3 for DXR) --
+        foreach(SHADER RayGen ClosestHit Miss AnyHit)
+            set(_SHADER_INPUT ${RTX_SHADER_DIR}/${SHADER}.hlsl)
+            set(_SHADER_OUTPUT ${RTX_SHADER_OUTPUT_DIR}/${SHADER}.cso)
+            if (EXISTS ${_SHADER_INPUT})
+                add_custom_command(
+                    OUTPUT ${_SHADER_OUTPUT}
+                    COMMAND ${DXC}
+                        -T lib_6_3
+                        -Fo ${_SHADER_OUTPUT}
+                        -I ${RTX_SHADER_DIR}
+                        -nologo
+                        ${_SHADER_INPUT}
+                    DEPENDS ${_SHADER_INPUT} ${RTX_SHADER_DIR}/Common.hlsli
+                    COMMENT "Compiling RTX shader ${SHADER}.hlsl -> ${SHADER}.cso (lib_6_3)"
+                    VERBATIM
+                )
+                list(APPEND RTX_COMPILED_SHADERS ${_SHADER_OUTPUT})
+            endif()
+        endforeach()
+
+        # -- Combined raytracing library (lib_6_3) --
+        if (EXISTS ${RTX_SHADER_DIR}/RTXRaytracing.hlsl)
+            set(_RTXRT_INPUT ${RTX_SHADER_DIR}/RTXRaytracing.hlsl)
+            set(_RTXRT_OUTPUT ${RTX_SHADER_OUTPUT_DIR}/RTXRaytracing.cso)
+            add_custom_command(
+                OUTPUT ${_RTXRT_OUTPUT}
+                COMMAND ${DXC}
+                    -T lib_6_3
+                    -Fo ${_RTXRT_OUTPUT}
+                    -I ${RTX_SHADER_DIR}
+                    -nologo
+                    ${_RTXRT_INPUT}
+                DEPENDS ${_RTXRT_INPUT} ${RTX_SHADER_DIR}/Common.hlsli
+                COMMENT "Compiling RTX combined library RTXRaytracing.hlsl -> RTXRaytracing.cso (lib_6_3)"
+                VERBATIM
+            )
+            list(APPEND RTX_COMPILED_SHADERS ${_RTXRT_OUTPUT})
+        endif()
+
+        # -- Compute shaders: compiled as cs_6_0 --
+        # Denoise
+        if (EXISTS ${RTX_SHADER_DIR}/Denoise.hlsl)
+            add_custom_command(
+                OUTPUT ${RTX_SHADER_OUTPUT_DIR}/Denoise.cso
+                COMMAND ${DXC}
+                    -T cs_6_0
+                    -E Denoise
+                    -Fo ${RTX_SHADER_OUTPUT_DIR}/Denoise.cso
+                    -I ${RTX_SHADER_DIR}
+                    -nologo
+                    ${RTX_SHADER_DIR}/Denoise.hlsl
+                DEPENDS ${RTX_SHADER_DIR}/Denoise.hlsl ${RTX_SHADER_DIR}/Common.hlsli
+                COMMENT "Compiling RTX shader Denoise.hlsl -> Denoise.cso (cs_6_0)"
+                VERBATIM
+            )
+            list(APPEND RTX_COMPILED_SHADERS ${RTX_SHADER_OUTPUT_DIR}/Denoise.cso)
+        endif()
+
+        # RTXGlobalIllumination
+        if (EXISTS ${RTX_SHADER_DIR}/RTXGlobalIllumination.hlsl)
+            add_custom_command(
+                OUTPUT ${RTX_SHADER_OUTPUT_DIR}/RTXGlobalIllumination.cso
+                COMMAND ${DXC}
+                    -T cs_6_0
+                    -E GlobalIllumination
+                    -Fo ${RTX_SHADER_OUTPUT_DIR}/RTXGlobalIllumination.cso
+                    -I ${RTX_SHADER_DIR}
+                    -nologo
+                    ${RTX_SHADER_DIR}/RTXGlobalIllumination.hlsl
+                DEPENDS ${RTX_SHADER_DIR}/RTXGlobalIllumination.hlsl ${RTX_SHADER_DIR}/Common.hlsli
+                COMMENT "Compiling RTX shader RTXGlobalIllumination.hlsl -> RTXGlobalIllumination.cso (cs_6_0)"
+                VERBATIM
+            )
+            list(APPEND RTX_COMPILED_SHADERS ${RTX_SHADER_OUTPUT_DIR}/RTXGlobalIllumination.cso)
+        endif()
+
+        # Accumulate
+        if (EXISTS ${RTX_SHADER_DIR}/Accumulate.hlsl)
+            add_custom_command(
+                OUTPUT ${RTX_SHADER_OUTPUT_DIR}/Accumulate.cso
+                COMMAND ${DXC}
+                    -T cs_6_0
+                    -E Accumulate
+                    -Fo ${RTX_SHADER_OUTPUT_DIR}/Accumulate.cso
+                    -I ${RTX_SHADER_DIR}
+                    -nologo
+                    ${RTX_SHADER_DIR}/Accumulate.hlsl
+                DEPENDS ${RTX_SHADER_DIR}/Accumulate.hlsl ${RTX_SHADER_DIR}/Common.hlsli
+                COMMENT "Compiling RTX shader Accumulate.hlsl -> Accumulate.cso (cs_6_0)"
+                VERBATIM
+            )
+            list(APPEND RTX_COMPILED_SHADERS ${RTX_SHADER_OUTPUT_DIR}/Accumulate.cso)
+        endif()
+
+        # Create a custom target for all RTX shaders and make soh depend on it
+        add_custom_target(RTXShaders ALL DEPENDS ${RTX_COMPILED_SHADERS})
+        add_dependencies(${PROJECT_NAME} RTXShaders)
+
+        # Copy compiled shaders to the output directory alongside the executable
+        add_custom_command(
+            TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:soh>/shaders
+            COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
+                ${RTX_SHADER_OUTPUT_DIR}
+                $<TARGET_FILE_DIR:soh>/shaders
+            COMMENT "Copying compiled RTX shaders to output directory"
+        )
+
+    else()
+        message(WARNING
+            "DXC (DirectX Shader Compiler) not found. "
+            "RTX shaders will NOT be compiled. "
+            "The RTX renderer will attempt to compile shaders at runtime. "
+            "Install the Windows SDK or Vulkan SDK to get dxc.exe, or set DXC manually."
+        )
+    endif()
+
+    # ==========================================================================
+    # 3. PREPROCESSOR DEFINITION
+    # ==========================================================================
+    # Ensure ENABLE_DX12_RTX is defined for all RTX translation units.
+    # This is also set conditionally in the x64 compile defs block above via
+    # generator expression, but we set it explicitly here for clarity.
+    # ==========================================================================
+    target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_DX12_RTX=1)
+
+    # Provide compile definitions for shader paths at runtime
+    target_compile_definitions(${PROJECT_NAME} PRIVATE
+        RTX_SHADER_SOURCE_DIR="${RTX_SHADER_DIR}"
+        RTX_COMPILED_SHADER_SUBDIR="shaders"
+    )
+
+    # ==========================================================================
+    # 4. LINK LIBRARIES (verified: d3d12, dxgi, d3dcompiler, dxguid)
+    # ==========================================================================
+    # The required DX12/RTX libraries (d3d12, dxgi, d3dcompiler, dxguid, dxcompiler)
+    # are linked conditionally in the ADDITIONAL_LIBRARY_DEPENDENCIES block below
+    # using $<$<BOOL:${ENABLE_DX12_RTX}>:libname> generator expressions.
+    # This note confirms all four required libraries are present:
+    #   - d3d12.lib      (DX12 core API)
+    #   - dxgi.lib       (DXGI swap chain, adapter enumeration)
+    #   - d3dcompiler.lib (legacy shader compilation API)
+    #   - dxguid.lib     (DX12 debug GUIDs)
+    #   - dxcompiler.lib (DXC runtime shader compilation)
+    # ==========================================================================
+
+    # ============================================================================
+    # PREPROCESSOR GUARDS NOTE (Phase 9):
+    # ============================================================================
+    # All RTX hook call sites in non-RTX source files (e.g., SceneIntegration hooks
+    # in z_scene_table.c, z_play.c, OTRGlobals.cpp, z_scene_otr.cpp) MUST be
+    # wrapped in preprocessor guards:
+    #
+    #   #ifdef ENABLE_DX12_RTX
+    #   #include "soh/Enhancements/RTX/RTXHooks.h"
+    #   #endif
+    #
+    #   // At the call site:
+    #   #ifdef ENABLE_DX12_RTX
+    #       if (RTX_IsActive()) {
+    #           RTX_UpdateSceneParams(play);
+    #           return;
+    #       }
+    #   #endif
+    #
+    # This ensures that non-Windows builds (and Windows builds with
+    # ENABLE_DX12_RTX=OFF) compile without any RTX dependencies.
+    # ============================================================================
+
+    message(STATUS "RTX DX12 raytracing support: ENABLED")
+    message(STATUS "  RTX source dir:  ${RTX_SOURCE_DIR}")
+    message(STATUS "  RTX shader dir:  ${RTX_SHADER_DIR}")
+    message(STATUS "  RTX shader out:  ${RTX_SHADER_OUTPUT_DIR}")
+    message(STATUS "  RTX sources:     ${CMAKE_CURRENT_SOURCE_DIR}/soh/Enhancements/RTX/")
+
+else()
+    message(STATUS "RTX DX12 raytracing support: DISABLED (Windows x64 only)")
+endif()
+
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
     find_package(glfw3 REQUIRED)
 	find_package(Ogg CONFIG REQUIRED)
@@ -654,6 +992,11 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
 			"Vorbis::vorbisenc"
 			"Vorbis::vorbisfile"
 			"OpusFile::opusfile"
+			"$<$<BOOL:${ENABLE_DX12_RTX}>:d3d12>"
+			"$<$<BOOL:${ENABLE_DX12_RTX}>:dxgi>"
+			"$<$<BOOL:${ENABLE_DX12_RTX}>:d3dcompiler>"
+			"$<$<BOOL:${ENABLE_DX12_RTX}>:dxguid>"
+			"$<$<BOOL:${ENABLE_DX12_RTX}>:dxcompiler>"
 		)
 	elseif("${CMAKE_VS_PLATFORM_NAME}" STREQUAL "Win32")
 		set(ADDITIONAL_LIBRARY_DEPENDENCIES
@@ -734,9 +1077,9 @@ INSTALL(FILES ${CMAKE_BINARY_DIR}/gamecontrollerdb.txt DESTINATION ../MacOS COMP
 INSTALL(FILES ${CMAKE_BINARY_DIR}/soh/soh.o2r DESTINATION ../Resources COMPONENT ship)
 elseif(NOT "${CMAKE_SYSTEM_NAME}" MATCHES "NintendoSwitch|CafeOS")
 INSTALL(FILES ${CMAKE_BINARY_DIR}/gamecontrollerdb.txt DESTINATION . COMPONENT ship)
-endif()
-
-if(CMAKE_SYSTEM_NAME MATCHES "NintendoSwitch|CafeOS")
+if (NOT TARGET pathconf)
+        add_library(pathconf OBJECT platform/pathconf.c)
+    endif()
     if (NOT TARGET pathconf)
         add_library(pathconf OBJECT platform/pathconf.c)
     endif()
