@@ -8,6 +8,9 @@
  *    - Argument 4: Scene draw config index
  *    - Argument 5: ? (Unknown)
  *    - Argument 6: ? (Unknown)
+ * 
+ * RTX Configuration:
+ * RTX_SCENE_KOKIRI_FOREST 0x55
  */
 /* 0x00 */ DEFINE_SCENE(ydan_scene, g_pn_06, SCENE_DEKU_TREE, SDC_DEKU_TREE, 1, 2)
 /* 0x01 */ DEFINE_SCENE(ddan_scene, g_pn_08, SCENE_DODONGOS_CAVERN, SDC_DODONGOS_CAVERN, 1, 3)

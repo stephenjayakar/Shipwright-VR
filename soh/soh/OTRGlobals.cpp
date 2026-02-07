@@ -45,6 +45,11 @@
 #include "Enhancements/custom-message/CustomMessageManager.h"
 #include "util.h"
 
+// RTX Integration
+#ifdef ENABLE_DX12_RTX
+#include "Enhancements/RTX/RTXHooks.h"
+#endif
+
 #if not defined(__SWITCH__) && not defined(__WIIU__)
 #include "Extractor/Extract.h"
 #endif
