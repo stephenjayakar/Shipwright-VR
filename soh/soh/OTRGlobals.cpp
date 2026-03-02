@@ -51,6 +51,10 @@
 
 #include <fast/interpreter.h>
 
+#ifdef ENABLE_DX12_RTX
+#include "Enhancements/RTX/RTXHooks.h"
+#endif
+
 #ifdef __APPLE__
 #include <SDL_scancode.h>
 #else
@@ -122,6 +126,14 @@
 
 #include "soh/config/ConfigUpdaters.h"
 #include "soh/ShipInit.hpp"
+
+// Declared in gfx_dxgi.cpp — this is a DECLARATION, not a definition.
+// The DEFINITION (with = false) lives in gfx_dxgi.cpp.
+// Previous cycles had `= false` here which created a DUPLICATE DEFINITION,
+// potentially causing the linker to use a separate copy of the variable,
+// meaning OTRGlobals.cpp and gfx_dxgi.cpp might have been reading/writing
+// DIFFERENT booleans — explaining why blocking never worked!
+extern "C" volatile bool g_rtxPresentBlocked;
 
 bool SoH_HandleConfigDrop(char* filePath);
 
@@ -301,6 +313,15 @@ OTRGlobals::OTRGlobals() {
         std::make_shared<SohInputEditorWindow>(CVAR_WINDOW("ControllerConfiguration"), "Configure Controller");
     sohFast3dWindow =
         std::make_shared<Fast::Fast3dWindow>(std::vector<std::shared_ptr<Ship::GuiWindow>>({ sohInputEditorWindow }));
+
+    // Initialize DX12 device and register bridge callbacks BEFORE InitWindow.
+    // This ensures that when gfx_dxgi.cpp creates the swap chain (inside InitWindow),
+    // GfxDX12Bridge_IsActive() returns true and the swap chain is created with the
+    // DX12 command queue instead of the DX11 device.
+#ifdef ENABLE_DX12_RTX
+    RTX_EarlyInit();
+#endif
+
     context->InitWindow(sohFast3dWindow);
 
     SohGui::SetupMenu();
@@ -1534,6 +1555,10 @@ extern "C" void InitOTR(int argc, char* argv[]) {
     ShipInit::InitAll();
     Rando::StaticData::InitHashMaps();
     OTRGlobals::Instance->gRandoContext->AddExcludedOptions();
+
+    // Note: RTX initialization is deferred (lazy) until Kokiri Forest is first
+    // loaded. See RTXHooks.cpp TryLazyInitialize() which is called from
+    // RTX_OnSceneLoaded() when an RTX-enabled scene is entered.
 }
 
 extern "C" void SaveManager_ThreadPoolWait() {
@@ -1556,6 +1581,11 @@ extern "C" void DeinitOTR() {
     SDLNet_Quit();
 #endif
 
+#ifdef ENABLE_DX12_RTX
+    // RTX HOOK: Shut down the DX12 RTX renderer before destroying the window.
+    RTX_Shutdown();
+#endif
+
     // Destroying gui here because we have shared ptrs to LUS objects which output to SPDLOG which is destroyed before
     // these shared ptrs.
     SohGui::Destroy();
@@ -1563,6 +1593,125 @@ extern "C" void DeinitOTR() {
 
     OTRGlobals::Instance->context = nullptr;
 }
+
+#ifdef ENABLE_DX12_RTX
+// Temporarily define ENABLE_DX11 to make the DXGI/DX11 backend headers visible.
+// These headers are guarded by #if defined(ENABLE_DX11) || defined(ENABLE_DX12),
+// and libultraship compiles them with ENABLE_DX11 defined, but the soh target
+// may not define it in Release mode. We need access to the class declarations
+// to tear down the DX11 swap chain for DX12 takeover.
+#if !defined(ENABLE_DX11) && !defined(ENABLE_DX12)
+#define ENABLE_DX11
+#define RTX_UNDEF_ENABLE_DX11
+#endif
+#include <fast/backends/gfx_window_manager_api.h>
+#include <fast/backends/gfx_dxgi.h>
+#include <fast/backends/gfx_direct3d_common.h>
+#ifdef RTX_UNDEF_ENABLE_DX11
+#undef ENABLE_DX11
+#undef RTX_UNDEF_ENABLE_DX11
+#endif
+
+// Track whether the DX11 swap chain has been released for DX12 takeover.
+// When this is true, RunCommands must not call into DX11/DXGI rendering.
+static bool s_dx11SwapChainReleased = false;
+
+// RTX helper: Check if the DX11 swap chain has been released.
+extern "C" int RTX_IsDX11SwapChainReleased(void) {
+    return s_dx11SwapChainReleased ? 1 : 0;
+}
+
+// RTX helper: Get the game window HWND without releasing the DX11 swap chain.
+// Used for probing DX12/DXR support before committing to the handoff.
+extern "C" void* RTX_GetWindowHWND(void) {
+    auto wnd = std::dynamic_pointer_cast<Fast::Fast3dWindow>(Ship::Context::GetInstance()->GetWindow());
+    if (!wnd) {
+        return nullptr;
+    }
+    auto interpreter = wnd->GetInterpreterWeak().lock();
+    if (!interpreter) {
+        return nullptr;
+    }
+    auto* dxgiBackend = dynamic_cast<Fast::GfxWindowBackendDXGI*>(interpreter->mWapi);
+    if (!dxgiBackend) {
+        return nullptr;
+    }
+    return (void*)dxgiBackend->GetWindowHandle();
+}
+
+// RTX helper: Tear down the DX11 swap chain so that DX12 can create its own
+// on the same HWND. Returns the HWND (as void*) on success, nullptr on failure.
+// This must be called BEFORE DX12Device::Initialize().
+extern "C" void* RTX_AcquireWindowForDX12(void) {
+    auto wnd = std::dynamic_pointer_cast<Fast::Fast3dWindow>(Ship::Context::GetInstance()->GetWindow());
+    if (!wnd) {
+        SPDLOG_ERROR("[RTX] RTX_AcquireWindowForDX12: no Fast3dWindow");
+        return nullptr;
+    }
+
+    auto interpreter = wnd->GetInterpreterWeak().lock();
+    if (!interpreter) {
+        SPDLOG_ERROR("[RTX] RTX_AcquireWindowForDX12: no interpreter");
+        return nullptr;
+    }
+
+    // Get the DXGI window backend
+    auto* dxgiBackend = dynamic_cast<Fast::GfxWindowBackendDXGI*>(interpreter->mWapi);
+    if (!dxgiBackend) {
+        SPDLOG_ERROR("[RTX] RTX_AcquireWindowForDX12: not using DXGI backend");
+        return nullptr;
+    }
+
+    HWND hwnd = dxgiBackend->GetWindowHandle();
+    if (!hwnd) {
+        SPDLOG_ERROR("[RTX] RTX_AcquireWindowForDX12: null HWND");
+        return nullptr;
+    }
+
+    // Get the DX11 rendering API to release its swap-chain-dependent resources
+    auto* dx11Api = dynamic_cast<Fast::GfxRenderingAPIDX11*>(interpreter->mRapi);
+    if (dx11Api) {
+        // Flush and clear DX11 state to release references to swap chain buffers
+        if (dx11Api->mContext) {
+            dx11Api->mContext->ClearState();
+            dx11Api->mContext->Flush();
+        }
+        SPDLOG_INFO("[RTX] DX11 state flushed");
+    }
+
+    // Release the DXGI swap chain via the clean public API.
+    // This calls the before_destroy callback (which releases DX11's render
+    // target views and swap chain buffer references), closes the waitable
+    // object, and resets the internal ComPtrs.
+    dxgiBackend->ReleaseSwapChain();
+    s_dx11SwapChainReleased = true;
+    SPDLOG_INFO("[RTX] DX11 swap chain released (HWND: {})", (void*)hwnd);
+
+    // Get window dimensions (GetDimensions requires non-null pointers for all params)
+    uint32_t dimW = 0, dimH = 0;
+    int32_t dimX = 0, dimY = 0;
+    dxgiBackend->GetDimensions(&dimW, &dimH, &dimX, &dimY);
+    SPDLOG_INFO("[RTX] Acquired window for DX12: HWND={}, {}x{}", (void*)hwnd, dimW, dimH);
+
+    return (void*)hwnd;
+}
+
+// RTX helper: Get the window dimensions from the DXGI backend.
+extern "C" void RTX_GetWindowDimensions(unsigned int* width, unsigned int* height) {
+    auto wnd = std::dynamic_pointer_cast<Fast::Fast3dWindow>(Ship::Context::GetInstance()->GetWindow());
+    if (!wnd) return;
+    auto interpreter = wnd->GetInterpreterWeak().lock();
+    if (!interpreter) return;
+    auto* dxgiBackend = dynamic_cast<Fast::GfxWindowBackendDXGI*>(interpreter->mWapi);
+    if (!dxgiBackend) return;
+    uint32_t w = 0, h = 0;
+    int32_t px = 0, py = 0;
+    dxgiBackend->GetDimensions(&w, &h, &px, &py);
+    if (width) *width = w;
+    if (height) *height = h;
+}
+
+#endif // ENABLE_DX12_RTX
 
 #ifdef _WIN32
 extern "C" uint64_t GetFrequency() {
@@ -1704,20 +1853,88 @@ extern "C" void Graph_StartFrame() {
 }
 
 void RunCommands(Gfx* Commands, const std::vector<std::unordered_map<Mtx*, MtxF>>& mtx_replacements) {
+#ifdef ENABLE_DX12_RTX
+    // DX12 Bridge: DX11 draw calls are blocked by IsDX11Blocked() in gfx_dxgi.cpp.
+    // RunCommands still executes for window event handling and Present routing.
+    {
+        static int s_runCmdCount = 0;
+        s_runCmdCount++;
+        if (s_runCmdCount <= 5 || (s_runCmdCount % 300) == 0) {
+            printf("[RTX] RunCommands #%d (bridge active, DX11 draws are no-ops)\n", s_runCmdCount);
+        }
+    }
+#endif
+
     auto wnd = std::dynamic_pointer_cast<Fast::Fast3dWindow>(OTRGlobals::Instance->context->GetWindow());
 
     if (wnd == nullptr) {
         return;
     }
 
+#ifdef ENABLE_DX12_RTX
+    {
+        static int s_rcStep = 0;
+        s_rcStep++;
+        if (s_rcStep <= 5) {
+            FILE* f = fopen("rtx_bridge_debug.log", "a");
+            if (f) {
+                fprintf(f, "RunCommands #%d: wnd=%p, calling HandleEvents...\n", s_rcStep, (void*)wnd.get());
+                fflush(f); fclose(f);
+            }
+        }
+    }
+#endif
+
     // Process window events for resize, mouse, keyboard events
     wnd->HandleEvents();
+
+#ifdef ENABLE_DX12_RTX
+    {
+        static int s_rcStep2 = 0;
+        s_rcStep2++;
+        if (s_rcStep2 <= 5) {
+            FILE* f = fopen("rtx_bridge_debug.log", "a");
+            if (f) {
+                fprintf(f, "RunCommands #%d: HandleEvents done, mtx_replacements=%zu, starting DrawAndRun loop...\n",
+                        s_rcStep2, mtx_replacements.size());
+                fflush(f); fclose(f);
+            }
+        }
+    }
+#endif
 
     UIWidgets::Colors themeColor =
         static_cast<UIWidgets::Colors>(CVarGetInteger(CVAR_SETTING("Menu.Theme"), UIWidgets::Colors::LightBlue));
     ImGui::PushStyleColor(ImGuiCol_TitleBgActive, UIWidgets::ColorValues.at(themeColor));
     for (const auto& m : mtx_replacements) {
+#ifdef ENABLE_DX12_RTX
+        {
+            static int s_drawIter = 0;
+            s_drawIter++;
+            if (s_drawIter <= 5) {
+                FILE* f = fopen("rtx_bridge_debug.log", "a");
+                if (f) {
+                    fprintf(f, "RunCommands: DrawAndRunGraphicsCommands iter #%d, Commands=%p...\n",
+                            s_drawIter, (void*)Commands);
+                    fflush(f); fclose(f);
+                }
+            }
+        }
+#endif
         wnd->DrawAndRunGraphicsCommands(Commands, m);
+#ifdef ENABLE_DX12_RTX
+        {
+            static int s_drawDone = 0;
+            s_drawDone++;
+            if (s_drawDone <= 5) {
+                FILE* f = fopen("rtx_bridge_debug.log", "a");
+                if (f) {
+                    fprintf(f, "RunCommands: DrawAndRunGraphicsCommands iter #%d DONE\n", s_drawDone);
+                    fflush(f); fclose(f);
+                }
+            }
+        }
+#endif
     }
     ImGui::PopStyleColor();
 }
@@ -1771,7 +1988,74 @@ extern "C" void Graph_ProcessGfxCommands(Gfx* commands) {
         mtx_replacements.emplace_back();
     }
 
+#ifdef ENABLE_DX12_RTX
+    // ========================================================================
+    // RTX DX12 Bridge Path
+    // ========================================================================
+    // With the DX12 bridge approach, the swap chain is DX12-owned from the start.
+    // gfx_dxgi.cpp handles calling GfxDX12Bridge_Present() in SwapBuffersBegin,
+    // which triggers RTXRenderer::RenderAndPresentFrame().
+    // 
+    // The game loop STILL runs the DX11 display list interpreter (RunCommands)
+    // but DX11 draw calls are blocked by IsDX11Blocked() in gfx_dxgi.cpp.
+    // The swap chain Present is handled by the bridge (DX12 path).
+    //
+    // We DON'T skip RunCommands because the bridge makes DX11 calls no-ops,
+    // and the window event handling happens inside the normal RunCommands path.
+    // ========================================================================
+    {
+        static uint32_t s_bridgeFrame = 0;
+        s_bridgeFrame++;
+        if (s_bridgeFrame <= 10 || (s_bridgeFrame % 300) == 0) {
+            int isActive = RTX_IsActive();
+            int bridgeActive = RTX_IsBridgeActive();
+            printf("[RTX] Frame #%u: RTX_IsActive=%d, BridgeActive=%d\n",
+                   s_bridgeFrame, isActive, bridgeActive);
+            
+            FILE* f = fopen("rtx_bridge_debug.log", "a");
+            if (f) {
+                fprintf(f, "GameLoop Frame #%u: RTX_IsActive=%d BridgeActive=%d\n",
+                        s_bridgeFrame, isActive, bridgeActive);
+                fflush(f);
+                fclose(f);
+            }
+        }
+    }
+#endif
+
+    // Always run the display list commands.
+    // With the DX12 bridge, DX11 draw calls are no-ops (IsDX11Blocked),
+    // but RunCommands still processes window events and the swap chain
+    // Present (which the bridge redirects to DX12).
+#ifdef ENABLE_DX12_RTX
+    {
+        static uint32_t s_rcFrame = 0;
+        s_rcFrame++;
+        if (s_rcFrame <= 5) {
+            FILE* f = fopen("rtx_bridge_debug.log", "a");
+            if (f) {
+                fprintf(f, "RunCommands ENTRY #%u: commands=%p\n", s_rcFrame, (void*)commands);
+                fflush(f);
+                fclose(f);
+            }
+        }
+    }
+#endif
     RunCommands(commands, mtx_replacements);
+#ifdef ENABLE_DX12_RTX
+    {
+        static uint32_t s_rcDoneFrame = 0;
+        s_rcDoneFrame++;
+        if (s_rcDoneFrame <= 5) {
+            FILE* f = fopen("rtx_bridge_debug.log", "a");
+            if (f) {
+                fprintf(f, "RunCommands DONE #%u\n", s_rcDoneFrame);
+                fflush(f);
+                fclose(f);
+            }
+        }
+    }
+#endif
 
     last_fps = fps;
     last_update_rate = R_UPDATE_RATE;
@@ -2557,3 +2841,5 @@ bool SoH_HandleConfigDrop(char* filePath) {
 extern "C" void CheckTracker_RecalculateAvailableChecks() {
     CheckTracker::RecalculateAvailableChecks();
 }
+
+

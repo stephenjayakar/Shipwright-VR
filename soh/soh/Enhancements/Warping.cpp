@@ -82,18 +82,48 @@ void Warp(WarpPoint& warpPoint) {
         gPlayState->transitionTrigger = TRANS_TRIGGER_START;
         gPlayState->transitionType = TRANS_TYPE_INSTANT;
     }
-    gSaveContext.respawn[RESPAWN_MODE_DOWN].entranceIndex = warpPoint.entranceId;
-    gSaveContext.respawn[RESPAWN_MODE_DOWN].roomIndex = warpPoint.roomNum;
-    gSaveContext.respawn[RESPAWN_MODE_DOWN].pos = warpPoint.pos;
-    gSaveContext.respawn[RESPAWN_MODE_DOWN].yaw = warpPoint.rotY;
-    gSaveContext.respawn[RESPAWN_MODE_DOWN].playerParams = 0xDFF;
-    gSaveContext.nextTransitionType = TRANS_TYPE_FADE_BLACK_FAST;
-    gSaveContext.respawnFlag = 1;
-    static HOOK_ID hookId = 0;
-    hookId = REGISTER_VB_SHOULD(VB_INFLICT_VOID_DAMAGE, {
-        *should = false;
-        GameInteractor::Instance->UnregisterGameHookForID<GameInteractor::OnVanillaBehavior>(hookId);
-    });
+    // Only use the respawn position override if the warp point has a valid (non-zero) position.
+    // If position is (0,0,0), let the entrance system place the player at the default spawn point
+    // for the given entrance, which avoids spawning underground at the scene origin.
+    bool hasValidPosition = (warpPoint.pos.x != 0.0f || warpPoint.pos.y != 0.0f || warpPoint.pos.z != 0.0f);
+    if (hasValidPosition) {
+        gSaveContext.respawn[RESPAWN_MODE_DOWN].entranceIndex = warpPoint.entranceId;
+        gSaveContext.respawn[RESPAWN_MODE_DOWN].roomIndex = warpPoint.roomNum;
+        gSaveContext.respawn[RESPAWN_MODE_DOWN].pos = warpPoint.pos;
+        gSaveContext.respawn[RESPAWN_MODE_DOWN].yaw = warpPoint.rotY;
+        gSaveContext.respawn[RESPAWN_MODE_DOWN].playerParams = 0xDFF;
+        gSaveContext.nextTransitionType = TRANS_TYPE_FADE_BLACK_FAST;
+        gSaveContext.respawnFlag = 1;
+        // Suppress void damage for several frames after warp to let the player settle on the
+        // collision mesh. Some scenes (e.g. Zora's Domain) have complex geometry near the spawn
+        // and a single-frame suppression may not be enough.
+        static HOOK_ID hookId = 0;
+        static int voidSuppressFrames = 0;
+        voidSuppressFrames = 60;  // Suppress void damage for ~1 second (60 frames at 20fps)
+        hookId = REGISTER_VB_SHOULD(VB_INFLICT_VOID_DAMAGE, {
+            *should = false;
+            voidSuppressFrames--;
+            if (voidSuppressFrames <= 0) {
+                GameInteractor::Instance->UnregisterGameHookForID<GameInteractor::OnVanillaBehavior>(hookId);
+            }
+        });
+    } else {
+        // No explicit position: let the entrance system handle spawn placement.
+        // Also suppress void damage briefly in case the entrance spawn has issues with
+        // the debug save state (e.g. Zora's Domain entrance 0x108).
+        gSaveContext.nextTransitionType = TRANS_TYPE_FADE_BLACK_FAST;
+        gSaveContext.respawnFlag = 0;
+        static HOOK_ID hookId2 = 0;
+        static int voidSuppressFrames2 = 0;
+        voidSuppressFrames2 = 60;  // Suppress void damage for ~1 second
+        hookId2 = REGISTER_VB_SHOULD(VB_INFLICT_VOID_DAMAGE, {
+            *should = false;
+            voidSuppressFrames2--;
+            if (voidSuppressFrames2 <= 0) {
+                GameInteractor::Instance->UnregisterGameHookForID<GameInteractor::OnVanillaBehavior>(hookId2);
+            }
+        });
+    }
 }
 
 static std::string warpNameInput = "";

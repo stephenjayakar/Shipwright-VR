@@ -2,6 +2,7 @@
 #include "ResourceManagerHelpers.h"
 #include <libultraship/libultraship.h>
 #include "soh/resource/type/Scene.h"
+#include "soh/Enhancements/RTX/RTXHooks.h"
 #include <ship/utils/StringHelper.h>
 #include "global.h"
 #include "vt.h"
@@ -477,6 +478,17 @@ extern "C" s32 OTRfunc_800973FC(PlayState* play, RoomContext* roomCtx) {
             Actor_SpawnTransitionActors(play, &play->actorCtx);
 
             GameInteractor_ExecuteAfterSceneCommands(play->sceneNum);
+
+#ifdef ENABLE_DX12_RTX
+            // RTX HOOK: Trigger geometry extraction and BLAS building
+            // when a room finishes loading in any RTX-enabled scene.
+            {
+                extern int RTX_IsKokiriForest(void*);
+                if (RTX_IsKokiriForest((void*)play)) {
+                    RTX_OnRoomLoaded((void*)play, roomCtx->curRoom.num);
+                }
+            }
+#endif
 
             return 1;
         }

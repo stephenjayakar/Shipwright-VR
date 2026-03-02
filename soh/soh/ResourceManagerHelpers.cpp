@@ -14,6 +14,7 @@
 #include <fast/Fast3dWindow.h>
 #include <fast/resource/ResourceType.h>
 #include <fast/resource/type/DisplayList.h>
+#include <fast/resource/type/Texture.h>
 
 extern "C" PlayState* gPlayState;
 
@@ -217,6 +218,14 @@ extern "C" char* ResourceMgr_GetResourceDataByNameHandlingMQ(const char* path) {
 extern "C" uint8_t ResourceMgr_TexIsRaw(const char* texPath) {
     auto res = std::static_pointer_cast<Fast::Texture>(ResourceMgr_GetResourceByNameHandlingMQ(texPath));
     return res->Flags & TEX_FLAG_LOAD_AS_RAW;
+}
+
+extern "C" uint16_t ResourceMgr_LoadTexWidthByName(char* texPath) {
+    return ResourceGetTexWidthByName(texPath);
+}
+
+extern "C" uint16_t ResourceMgr_LoadTexHeightByName(char* texPath) {
+    return ResourceGetTexHeightByName(texPath);
 }
 
 extern "C" uint8_t ResourceMgr_ResourceIsBackground(char* texPath) {
@@ -480,6 +489,114 @@ extern "C" CollisionHeader* ResourceMgr_LoadColByName(const char* path) {
 extern "C" Vtx* ResourceMgr_LoadVtxByName(char* path) {
     return (Vtx*)ResourceGetDataByName(path);
 }
+
+#ifdef ENABLE_DX12_RTX
+extern "C" Vtx* ResourceMgr_LoadVtxByCRC(uint64_t crc) {
+    return (Vtx*)ResourceGetDataByCrc(crc);
+}
+
+extern "C" Gfx* ResourceMgr_LoadGfxByCRC(uint64_t crc) {
+    const char* name = ResourceGetNameByCrc(crc);
+    if (name == nullptr) return nullptr;
+    return ResourceMgr_LoadGfxByName(name);
+}
+
+extern "C" char* ResourceMgr_GetNameByCRC(uint64_t crc, char* alloc) {
+    const char* name = ResourceGetNameByCrc(crc);
+    if (name != nullptr && alloc != nullptr) {
+        strcpy(alloc, name);
+        return alloc;
+    }
+    return nullptr;
+}
+
+extern "C" char* ResourceMgr_LoadTexDataForRTX(const char* texPath, uint32_t* outType,
+                                                 uint16_t* outWidth, uint16_t* outHeight,
+                                                 uint32_t* outDataSize) {
+    if (!texPath || !outType || !outWidth || !outHeight || !outDataSize) {
+        return nullptr;
+    }
+
+    *outType = 0;
+    *outWidth = 0;
+    *outHeight = 0;
+    *outDataSize = 0;
+
+    try {
+        auto res = ResourceMgr_GetResourceByNameHandlingMQ(texPath);
+        if (!res) {
+            return nullptr;
+        }
+
+        // Check if it's a Texture resource
+        if (res->GetInitData()->Type == static_cast<uint32_t>(Fast::ResourceType::Texture)) {
+            auto tex = std::static_pointer_cast<Fast::Texture>(res);
+            if (!tex || !tex->ImageData) {
+                return nullptr;
+            }
+            *outType = static_cast<uint32_t>(tex->Type);
+            *outWidth = tex->Width;
+            *outHeight = tex->Height;
+            *outDataSize = tex->ImageDataSize;
+            return (char*)tex->ImageData;
+        }
+
+        // Not a Texture resource - might be an Array or DisplayList
+        // Fall back to raw data
+        *outWidth = ResourceGetTexWidthByName(texPath);
+        *outHeight = ResourceGetTexHeightByName(texPath);
+        *outDataSize = (uint32_t)res->GetPointerSize();
+        *outType = 0; // Unknown type - caller should treat as raw
+        return (char*)res->GetRawPointer();
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+extern "C" char* ResourceMgr_LoadTexDataForRTXByCRC(uint64_t crc, uint32_t* outType,
+                                                     uint16_t* outWidth, uint16_t* outHeight,
+                                                     uint32_t* outDataSize) {
+    if (!outType || !outWidth || !outHeight || !outDataSize) {
+        return nullptr;
+    }
+
+    *outType = 0;
+    *outWidth = 0;
+    *outHeight = 0;
+    *outDataSize = 0;
+
+    try {
+        // First try to get the name from the CRC, then load by name
+        const char* name = ResourceGetNameByCrc(crc);
+        if (name && name[0] != '\0') {
+            return ResourceMgr_LoadTexDataForRTX(name, outType, outWidth, outHeight, outDataSize);
+        }
+
+        // If name lookup fails, try loading the resource directly by CRC
+        auto res = Ship::Context::GetInstance()->GetResourceManager()->LoadResource(crc);
+        if (!res) {
+            return nullptr;
+        }
+
+        // Check if it's a Texture resource
+        if (res->GetInitData()->Type == static_cast<uint32_t>(Fast::ResourceType::Texture)) {
+            auto tex = std::static_pointer_cast<Fast::Texture>(res);
+            if (!tex || !tex->ImageData) {
+                return nullptr;
+            }
+            *outType = static_cast<uint32_t>(tex->Type);
+            *outWidth = tex->Width;
+            *outHeight = tex->Height;
+            *outDataSize = tex->ImageDataSize;
+            return (char*)tex->ImageData;
+        }
+
+        return nullptr;
+    } catch (...) {
+        return nullptr;
+    }
+}
+#endif
 
 extern "C" SequenceData ResourceMgr_LoadSeqByName(const char* path) {
     SequenceData* sequence = (SequenceData*)ResourceGetDataByName(path);

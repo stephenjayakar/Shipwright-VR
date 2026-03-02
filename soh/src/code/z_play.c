@@ -21,6 +21,8 @@
 #include <time.h>
 #include <assert.h>
 
+#include "soh/Enhancements/RTX/RTXHooks.h"
+
 TransitionUnk sTrnsnUnk;
 s32 gTrnsnUnkState;
 VisMono gPlayVisMono;
@@ -202,6 +204,12 @@ Gfx* Play_SetFog(PlayState* play, Gfx* gfx) {
 void Play_Destroy(GameState* thisx) {
     PlayState* play = (PlayState*)thisx;
     Player* player = GET_PLAYER(play);
+
+#ifdef ENABLE_DX12_RTX
+    // RTX HOOK: Release acceleration structures, textures, and GPU buffers
+    // when leaving a scene.
+    RTX_OnSceneUnload();
+#endif
 
     GameInteractor_ExecuteOnPlayDestroy();
 
@@ -739,6 +747,10 @@ void Play_Update(PlayState* play) {
     if (FrameAdvance_Update(&play->frameAdvCtx, &input[1])) {
         if ((play->transitionMode == TRANS_MODE_OFF) && (play->transitionTrigger != TRANS_TRIGGER_OFF)) {
             play->transitionMode = TRANS_MODE_SETUP;
+            LUSLOG_INFO("[DIAG] Transition triggered! trigger=%d type=%d nextEntrance=0x%X scene=0x%X respawnFlag=%d cutsceneIdx=0x%X gameplayFrames=%u",
+                        play->transitionTrigger, play->transitionType, play->nextEntranceIndex,
+                        play->sceneNum, gSaveContext.respawnFlag, gSaveContext.cutsceneIndex,
+                        play->gameplayFrames);
         }
 
         // #region SOH [Stats] Gameplay stats: Count button presses
@@ -1547,8 +1559,18 @@ void Play_Draw(PlayState* play) {
                     roomDrawFlags = HREG(84);
                 }
                 Scene_Draw(play);
+#ifdef ENABLE_DX12_RTX
+                // RTX HOOK: When RTX renderer is active for an RTX-enabled scene
+                // (e.g., Kokiri Forest), it handles room geometry via acceleration
+                // structures. Skip the normal Fast3D room draw path only for those
+                // scenes — non-RTX scenes still use the standard Room_Draw path.
+                if (!RTX_IsActive() || !RTX_IsKokiriForest(play)) {
+#endif
                 Room_Draw(play, &play->roomCtx.curRoom, roomDrawFlags & 3);
                 Room_Draw(play, &play->roomCtx.prevRoom, roomDrawFlags & 3);
+#ifdef ENABLE_DX12_RTX
+                }
+#endif
             }
         }
 
@@ -2132,6 +2154,10 @@ void Play_SetupRespawnPoint(PlayState* play, s32 respawnMode, s32 playerParams) 
 }
 
 void Play_TriggerVoidOut(PlayState* play) {
+    LUSLOG_INFO("[DIAG] Play_TriggerVoidOut called! scene=0x%X nextEntrance=0x%X respawnEntrance=0x%X playerY=%.1f",
+                play->sceneNum, play->nextEntranceIndex,
+                gSaveContext.respawn[RESPAWN_MODE_DOWN].entranceIndex,
+                GET_PLAYER(play) ? GET_PLAYER(play)->actor.world.pos.y : -9999.0f);
     gSaveContext.respawn[RESPAWN_MODE_DOWN].tempSwchFlags = play->actorCtx.flags.tempSwch;
     gSaveContext.respawn[RESPAWN_MODE_DOWN].tempCollectFlags = play->actorCtx.flags.tempCollect;
     gSaveContext.respawnFlag = 1;
@@ -2141,6 +2167,8 @@ void Play_TriggerVoidOut(PlayState* play) {
 }
 
 void Play_LoadToLastEntrance(PlayState* play) {
+    LUSLOG_INFO("[DIAG] Play_LoadToLastEntrance called! scene=0x%X entranceIndex=0x%X",
+                play->sceneNum, gSaveContext.entranceIndex);
     gSaveContext.respawnFlag = -1;
     play->transitionTrigger = TRANS_TRIGGER_START;
 

@@ -7,6 +7,7 @@
 #include "global.h"
 #include "vt.h"
 #include <fast/resource/type/Vertex.h>
+#include "soh/Enhancements/RTX/RTXHooks.h"
 
 extern "C" void Play_InitScene(PlayState* play, s32 spawn);
 extern "C" void Play_InitEnvironment(PlayState* play, s16 skyboxId);
@@ -61,6 +62,12 @@ extern "C" void OTRPlay_SpawnScene(PlayState* play, s32 sceneId, s32 spawn) {
 
     GameInteractor_ExecuteOnSceneInit(play->sceneNum);
     SPDLOG_INFO("Scene Init - sceneNum: {0:#x}, entranceIndex: {1:#x}", play->sceneNum, gSaveContext.entranceIndex);
+
+#ifdef ENABLE_DX12_RTX
+    // RTX HOOK: Notify the RTX renderer that a new scene has been loaded.
+    // If this is Kokiri Forest, the renderer will prepare for RTX rendering.
+    RTX_OnSceneLoaded(play->sceneNum);
+#endif
 }
 
 void OTRPlay_InitScene(PlayState* play, s32 spawn) {

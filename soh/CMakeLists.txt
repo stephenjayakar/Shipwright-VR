@@ -16,6 +16,15 @@ set (BUILD_UTILS OFF CACHE STRING "no utilities")
 set (BUILD_SHARED_LIBS OFF CACHE STRING "install/link shared instead of static libs")
 
 ################################################################################
+# RTX DX12 Raytracing Option
+################################################################################
+if (CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_SIZEOF_VOID_P EQUAL 8)
+    option(ENABLE_DX12_RTX "Enable DirectX 12 RTX raytracing for Kokiri Forest" ON)
+else()
+    set(ENABLE_DX12_RTX OFF CACHE BOOL "Enable DirectX 12 RTX raytracing (Windows x64 only)" FORCE)
+endif()
+
+################################################################################
 # Set target arch type if empty. Visual studio solution generator provides it.
 ################################################################################
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
@@ -156,6 +165,11 @@ else()
     list(FILTER soh__ EXCLUDE REGEX "soh/Enhancements/speechsynthesizer/(Darwin|SAPI)")
 endif()
 
+# handle RTX removals
+if (NOT ENABLE_DX12_RTX)
+    list(FILTER soh__ EXCLUDE REGEX "soh/Enhancements/RTX/")
+endif()
+
 find_library(ESPEAK espeak-ng)
 if (NOT ESPEAK)
     list(FILTER soh__ EXCLUDE REGEX "soh/Enhancements/speechsynthesizer/ESpeak")
@@ -224,6 +238,284 @@ set(ALL_FILES
 # Target
 ################################################################################
 add_executable(${PROJECT_NAME} ${ALL_FILES})
+
+################################################################################
+# RTX Build System Integration
+################################################################################
+if (ENABLE_DX12_RTX AND CMAKE_SYSTEM_NAME STREQUAL "Windows")
+
+    set(RTX_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/soh/Enhancements/RTX)
+    set(RTX_SHADER_DIR ${RTX_SOURCE_DIR}/Shaders)
+
+    set(RTX_SOURCES
+        ${RTX_SOURCE_DIR}/RTXTypes.h
+        ${RTX_SOURCE_DIR}/DX12Context.h
+        ${RTX_SOURCE_DIR}/DX12Device.h
+        ${RTX_SOURCE_DIR}/DX12Renderer.h
+        ${RTX_SOURCE_DIR}/RTXPipeline.h
+        ${RTX_SOURCE_DIR}/DXRPipeline.h
+        ${RTX_SOURCE_DIR}/RTAccelStructure.h
+        ${RTX_SOURCE_DIR}/AccelerationStructure.h
+        ${RTX_SOURCE_DIR}/RTXManager.h
+        ${RTX_SOURCE_DIR}/RTXRenderer.h
+        ${RTX_SOURCE_DIR}/RTXSceneManager.h
+        ${RTX_SOURCE_DIR}/SceneAdapter.h
+        ${RTX_SOURCE_DIR}/SceneGeometryExtractor.h
+        ${RTX_SOURCE_DIR}/TextureManager.h
+        ${RTX_SOURCE_DIR}/GISystem.h
+        ${RTX_SOURCE_DIR}/RTXSceneConfig.h
+        ${RTX_SOURCE_DIR}/RTXHooks.h
+        ${RTX_SOURCE_DIR}/RTXShaderCompiler.h
+        ${RTX_SOURCE_DIR}/RTXDiagLog.h
+        ${RTX_SOURCE_DIR}/RTXDiagnostics.h
+        ${RTX_SOURCE_DIR}/RTXScreenCapture.h
+        ${RTX_SOURCE_DIR}/UICompositor.h
+        ${RTX_SOURCE_DIR}/DX12Context.cpp
+        ${RTX_SOURCE_DIR}/DX12Device.cpp
+        ${RTX_SOURCE_DIR}/DX12Renderer.cpp
+        ${RTX_SOURCE_DIR}/RTXPipeline.cpp
+        ${RTX_SOURCE_DIR}/DXRPipeline.cpp
+        ${RTX_SOURCE_DIR}/RTAccelStructure.cpp
+        ${RTX_SOURCE_DIR}/AccelerationStructure.cpp
+        ${RTX_SOURCE_DIR}/RTXManager.cpp
+        ${RTX_SOURCE_DIR}/RTXRenderer.cpp
+        ${RTX_SOURCE_DIR}/RTXSceneManager.cpp
+        ${RTX_SOURCE_DIR}/SceneAdapter.cpp
+        ${RTX_SOURCE_DIR}/SceneConverter.cpp
+        ${RTX_SOURCE_DIR}/SceneGeometryExtractor.cpp
+        ${RTX_SOURCE_DIR}/TextureManager.cpp
+        ${RTX_SOURCE_DIR}/GISystem.cpp
+        ${RTX_SOURCE_DIR}/RTXSceneConfig.cpp
+        ${RTX_SOURCE_DIR}/RTXHooks.cpp
+        ${RTX_SOURCE_DIR}/RTXShaderCompiler.cpp
+        ${RTX_SOURCE_DIR}/RTXDiagnostics.cpp
+        ${RTX_SOURCE_DIR}/RTXScreenCapture.cpp
+        ${RTX_SOURCE_DIR}/UICompositor.cpp
+        ${RTX_SOURCE_DIR}/DX12Bridge.cpp
+    )
+
+    set(RTX_SHADER_SOURCES
+        ${RTX_SHADER_DIR}/Common.hlsli
+        ${RTX_SHADER_DIR}/RayGen.hlsl
+        ${RTX_SHADER_DIR}/ClosestHit.hlsl
+        ${RTX_SHADER_DIR}/Miss.hlsl
+        ${RTX_SHADER_DIR}/AnyHit.hlsl
+        ${RTX_SHADER_DIR}/Denoise.hlsl
+        ${RTX_SHADER_DIR}/RTXGlobalIllumination.hlsl
+        ${RTX_SHADER_DIR}/RTXRaytracing.hlsl
+        ${RTX_SHADER_DIR}/PostProcess.hlsl
+    )
+    if (EXISTS ${RTX_SHADER_DIR}/Accumulate.hlsl)
+        list(APPEND RTX_SHADER_SOURCES ${RTX_SHADER_DIR}/Accumulate.hlsl)
+    endif()
+    if (EXISTS ${RTX_SHADER_DIR}/Composite.hlsl)
+        list(APPEND RTX_SHADER_SOURCES ${RTX_SHADER_DIR}/Composite.hlsl)
+    endif()
+
+    set_source_files_properties(${RTX_SHADER_SOURCES} PROPERTIES HEADER_FILE_ONLY TRUE)
+
+    target_sources(${PROJECT_NAME} PRIVATE
+        ${RTX_SOURCES}
+        ${RTX_SHADER_SOURCES}
+    )
+
+    target_include_directories(${PROJECT_NAME} PRIVATE
+        ${RTX_SOURCE_DIR}
+    )
+
+    source_group("soh\\Enhancements\\RTX" FILES ${RTX_SOURCES})
+    source_group("soh\\Enhancements\\RTX\\Shaders" FILES ${RTX_SHADER_SOURCES})
+
+    # =========================================================================
+    # Shader Compilation (DXC)
+    # =========================================================================
+    set(RTX_SHADER_OUTPUT_DIR ${CMAKE_BINARY_DIR}/shaders)
+    file(MAKE_DIRECTORY ${RTX_SHADER_OUTPUT_DIR})
+
+    set(DXC_SEARCH_PATHS
+        "C:/Program Files (x86)/Windows Kits/10/bin/10.0.22621.0/x64/dxc.exe"
+        "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/dxc.exe"
+    )
+    set(DXC_EXE "")
+    foreach(_path ${DXC_SEARCH_PATHS})
+        if(EXISTS "${_path}")
+            set(DXC_EXE "${_path}")
+            break()
+        endif()
+    endforeach()
+
+    if(DXC_EXE STREQUAL "")
+        find_program(DXC_EXE NAMES dxc HINTS
+            "$ENV{WindowsSdkDir}bin/${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}/x64"
+        )
+    endif()
+
+    if(DXC_EXE)
+        message(STATUS "DXC found at: ${DXC_EXE}")
+
+        set(RTX_RT_SHADERS RayGen ClosestHit Miss AnyHit RTXRaytracing)
+        # CS shaders: NAME;ENTRY_POINT pairs
+        set(RTX_CS_SHADER_Denoise_ENTRY "Denoise")
+        set(RTX_CS_SHADER_RTXGlobalIllumination_ENTRY "GlobalIllumination")
+        set(RTX_CS_SHADER_Accumulate_ENTRY "Accumulate")
+        set(RTX_CS_SHADER_PostProcess_ENTRY "PostProcess")
+        set(RTX_CS_SHADER_Composite_ENTRY "Composite")
+        set(RTX_CS_SHADERS Denoise RTXGlobalIllumination Accumulate PostProcess Composite)
+
+        set(RTX_CSO_OUTPUTS "")
+
+        foreach(SHADER ${RTX_RT_SHADERS})
+            if(EXISTS "${RTX_SHADER_DIR}/${SHADER}.hlsl")
+                set(CSO_OUT "${RTX_SHADER_OUTPUT_DIR}/${SHADER}.cso")
+                add_custom_command(
+                    OUTPUT ${CSO_OUT}
+                    COMMAND "${DXC_EXE}" -T lib_6_3 -I "${RTX_SHADER_DIR}" -Fo "${CSO_OUT}" "${RTX_SHADER_DIR}/${SHADER}.hlsl"
+                    DEPENDS "${RTX_SHADER_DIR}/${SHADER}.hlsl" "${RTX_SHADER_DIR}/Common.hlsli"
+                    COMMENT "Compiling RT shader ${SHADER}.hlsl -> ${SHADER}.cso"
+                    VERBATIM
+                )
+                list(APPEND RTX_CSO_OUTPUTS ${CSO_OUT})
+            endif()
+        endforeach()
+
+        foreach(SHADER ${RTX_CS_SHADERS})
+            if(EXISTS "${RTX_SHADER_DIR}/${SHADER}.hlsl")
+                set(CSO_OUT "${RTX_SHADER_OUTPUT_DIR}/${SHADER}.cso")
+                set(_entry "${RTX_CS_SHADER_${SHADER}_ENTRY}")
+                add_custom_command(
+                    OUTPUT ${CSO_OUT}
+                    COMMAND "${DXC_EXE}" -T cs_6_0 -E ${_entry} -I "${RTX_SHADER_DIR}" -Fo "${CSO_OUT}" "${RTX_SHADER_DIR}/${SHADER}.hlsl"
+                    DEPENDS "${RTX_SHADER_DIR}/${SHADER}.hlsl" "${RTX_SHADER_DIR}/Common.hlsli"
+                    COMMENT "Compiling CS shader ${SHADER}.hlsl (entry: ${_entry}) -> ${SHADER}.cso"
+                    VERBATIM
+                )
+                list(APPEND RTX_CSO_OUTPUTS ${CSO_OUT})
+            endif()
+        endforeach()
+
+        add_custom_target(RTXShaders ALL DEPENDS ${RTX_CSO_OUTPUTS})
+        add_dependencies(${PROJECT_NAME} RTXShaders)
+
+        # Deploy CSOs and HLSL sources to the exe output directory.
+        # We use POST_BUILD on RTXShaders (not on soh) so deployment happens
+        # even when soh.exe doesn't need relinking. This is critical because
+        # shader-only changes don't trigger a soh relink, but the shaders
+        # still need to be deployed to the output directory.
+        #
+        # Deploy to ALL potential output directories to cover any CMake config.
+        # ${CMAKE_BINARY_DIR} is the build directory (e.g., build/)
+        # The actual exe may end up in various locations depending on generator.
+        set(RTX_DEPLOY_DIRS
+            "${CMAKE_SOURCE_DIR}/x64/Release/shaders"
+            "${CMAKE_SOURCE_DIR}/x64/Debug/shaders"
+            "${CMAKE_BINARY_DIR}/Release/shaders"
+            "${CMAKE_BINARY_DIR}/Debug/shaders"
+            "${CMAKE_BINARY_DIR}/shaders"
+        )
+        foreach(_deploy_dir ${RTX_DEPLOY_DIRS})
+            # Deploy CSO files
+            foreach(CSO_FILE ${RTX_CSO_OUTPUTS})
+                get_filename_component(CSO_NAME ${CSO_FILE} NAME)
+                add_custom_command(TARGET RTXShaders POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E make_directory "${_deploy_dir}"
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        "${CSO_FILE}" "${_deploy_dir}/${CSO_NAME}"
+                    COMMENT "Deploying ${CSO_NAME} to ${_deploy_dir}"
+                )
+            endforeach()
+        endforeach()
+
+        # Also deploy HLSL source files alongside CSOs.
+        # This ensures runtime DXC compilation has current sources available.
+        # The DXRPipeline code deletes CSOs and compiles from HLSL at runtime,
+        # so having up-to-date HLSL sources in the output dir is essential.
+        # Both .hlsl and .hlsli files are deployed (Common.hlsli is required for #includes).
+        #
+        # IMPORTANT: We use copy_directory on RTXShaders POST_BUILD instead of
+        # individual file copies on soh POST_BUILD. This ensures deployment
+        # happens whenever shaders are recompiled, not just when soh is relinked.
+        foreach(_deploy_dir ${RTX_DEPLOY_DIRS})
+            add_custom_command(TARGET RTXShaders POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E make_directory "${_deploy_dir}"
+                COMMAND ${CMAKE_COMMAND} -E copy_directory
+                    "${RTX_SHADER_DIR}" "${_deploy_dir}"
+                COMMENT "Deploying HLSL source files to ${_deploy_dir}"
+            )
+        endforeach()
+
+        # Also deploy via soh POST_BUILD as a safety net (covers first build).
+        # $<TARGET_FILE_DIR:soh> resolves to the ACTUAL exe output directory,
+        # which is the most reliable path. This ensures HLSL sources and CSOs
+        # are always next to the exe regardless of CMake generator or config.
+        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${PROJECT_NAME}>/shaders"
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${RTX_SHADER_DIR}" "$<TARGET_FILE_DIR:${PROJECT_NAME}>/shaders"
+            COMMENT "Deploying shader sources to output directory (via TARGET_FILE_DIR)"
+        )
+        foreach(CSO_FILE ${RTX_CSO_OUTPUTS})
+            get_filename_component(CSO_NAME ${CSO_FILE} NAME)
+            add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${CSO_FILE}" "$<TARGET_FILE_DIR:${PROJECT_NAME}>/shaders/${CSO_NAME}"
+                COMMENT "Copying ${CSO_NAME} to output (via TARGET_FILE_DIR)"
+            )
+        endforeach()
+
+        # Log deployment paths at build time for debugging
+        add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E echo "RTX Shader deployment: source=${RTX_SHADER_DIR}, target=$<TARGET_FILE_DIR:${PROJECT_NAME}>/shaders"
+            COMMENT "RTX shader deployment path info"
+        )
+    else()
+        message(WARNING "DXC not found. RTX shaders will not be compiled.")
+    endif()
+
+    # RTX compile definitions
+    # Use file(TO_CMAKE_PATH) to ensure forward slashes in the path define,
+    # preventing Windows backslash escaping issues in the C++ string literal.
+    file(TO_CMAKE_PATH "${RTX_SHADER_DIR}" RTX_SHADER_DIR_FWD)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE
+        ENABLE_DX12_RTX=1
+        RTX_SHADER_SOURCE_DIR="${RTX_SHADER_DIR_FWD}"
+        RTX_COMPILED_SHADER_SUBDIR="shaders"
+    )
+
+    # Post-build: Copy DXC runtime DLLs
+    set(DXC_DLL_SEARCH_PATHS
+        "${CMAKE_SOURCE_DIR}/dxc/bin/x64"
+        "$ENV{WindowsSdkDir}bin/${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}/x64"
+        "C:/Program Files (x86)/Windows Kits/10/bin/10.0.22621.0/x64"
+    )
+    set(DXC_DLLS dxcompiler.dll dxil.dll)
+    foreach(DXC_DLL ${DXC_DLLS})
+        set(_found FALSE)
+        foreach(_dir ${DXC_DLL_SEARCH_PATHS})
+            if(EXISTS "${_dir}/${DXC_DLL}")
+                add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        "${_dir}/${DXC_DLL}"
+                        "$<TARGET_FILE_DIR:${PROJECT_NAME}>/${DXC_DLL}"
+                    COMMENT "Copying ${DXC_DLL} from ${_dir}"
+                )
+                set(_found TRUE)
+                break()
+            endif()
+        endforeach()
+        if(NOT _found)
+            message(WARNING "DXC runtime DLL '${DXC_DLL}' not found. "
+                "Place it in ${CMAKE_SOURCE_DIR}/dxc/bin/x64/.")
+        endif()
+    endforeach()
+
+    message(STATUS "RTX DX12 raytracing support: ENABLED")
+else()
+    if(NOT ENABLE_DX12_RTX)
+        message(STATUS "RTX DX12 raytracing support: DISABLED")
+    else()
+        message(STATUS "RTX DX12 raytracing support: DISABLED (Windows x64 only)")
+    endif()
+endif()
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
 use_props(${PROJECT_NAME} "${CMAKE_CONFIGURATION_TYPES}" "${DEFAULT_CXX_PROPS}")
@@ -349,6 +641,7 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
 			STORMLIB_NO_AUTO_LINK
 			"_CRT_SECURE_NO_WARNINGS;"
             NOMINMAX
+			"$<$<BOOL:${ENABLE_DX12_RTX}>:ENABLE_DX12_RTX=1>"
 		)
 	elseif("${CMAKE_VS_PLATFORM_NAME}" STREQUAL "Win32")
 		target_compile_definitions(${PROJECT_NAME} PRIVATE
@@ -654,6 +947,11 @@ if (CMAKE_SYSTEM_NAME STREQUAL "Windows")
 			"Vorbis::vorbisenc"
 			"Vorbis::vorbisfile"
 			"OpusFile::opusfile"
+			"$<$<BOOL:${ENABLE_DX12_RTX}>:d3d12>"
+			"$<$<BOOL:${ENABLE_DX12_RTX}>:dxgi>"
+			"$<$<BOOL:${ENABLE_DX12_RTX}>:d3dcompiler>"
+			"$<$<BOOL:${ENABLE_DX12_RTX}>:dxguid>"
+			"$<$<BOOL:${ENABLE_DX12_RTX}>:dxcompiler>"
 		)
 	elseif("${CMAKE_VS_PLATFORM_NAME}" STREQUAL "Win32")
 		set(ADDITIONAL_LIBRARY_DEPENDENCIES
@@ -725,7 +1023,9 @@ INSTALL(FILES ${CMAKE_BINARY_DIR}/soh/soh.o2r DESTINATION . COMPONENT ship)
 endif()
 
 find_program(CURL NAMES curl DOC "Path to the curl program.  Used to download files.")
-execute_process(COMMAND ${CURL} -sSfL https://raw.githubusercontent.com/mdqinc/SDL_GameControllerDB/master/gamecontrollerdb.txt -o ${CMAKE_BINARY_DIR}/gamecontrollerdb.txt OUTPUT_VARIABLE RESULT)
+if (NOT EXISTS ${CMAKE_BINARY_DIR}/gamecontrollerdb.txt)
+    execute_process(COMMAND ${CURL} -sSfL https://raw.githubusercontent.com/mdqinc/SDL_GameControllerDB/master/gamecontrollerdb.txt -o ${CMAKE_BINARY_DIR}/gamecontrollerdb.txt OUTPUT_VARIABLE RESULT)
+endif()
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
 configure_file( ${CMAKE_CURRENT_SOURCE_DIR}/macosx/Info.plist.in ${CMAKE_BINARY_DIR}/macosx/Info.plist @ONLY)

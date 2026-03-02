@@ -210,6 +210,22 @@ bool AccelerationStructure::BuildBLAS(const RoomGeometry& geometry) {
             return false;
         }
 
+        // Log material textureIndex values to verify they were resolved correctly
+        {
+            uint32_t nonZero = 0, zero = 0;
+            for (size_t i = 0; i < mesh.materials.size(); i++) {
+                if (mesh.materials[i].textureIndex != 0) nonZero++;
+                else zero++;
+                if (i < 10) {
+                    RTX_DIAG("BuildBLAS opaque material[%zu]: texIdx=%u comb=%u alpha=%u water=%u",
+                             i, mesh.materials[i].textureIndex, mesh.materials[i].combinerMode,
+                             mesh.materials[i].isAlphaTested, mesh.materials[i].isWater);
+                }
+            }
+            RTX_DIAG("BuildBLAS opaque: %u materials with texIdx>0, %u with texIdx==0 (white fallback)",
+                     nonZero, zero);
+        }
+
         blasData.opaqueMaterialBuffer = UploadBuffer(
             mesh.materials.data(),
             mesh.materials.size() * sizeof(Material),
@@ -226,6 +242,22 @@ bool AccelerationStructure::BuildBLAS(const RoomGeometry& geometry) {
 
     if (hasAlpha) {
         const auto& mesh = geometry.alphaMesh;
+
+        // Log alpha material textureIndex values
+        {
+            uint32_t nonZero = 0, zero = 0;
+            for (size_t i = 0; i < mesh.materials.size(); i++) {
+                if (mesh.materials[i].textureIndex != 0) nonZero++;
+                else zero++;
+                if (i < 10) {
+                    RTX_DIAG("BuildBLAS alpha material[%zu]: texIdx=%u comb=%u alpha=%u water=%u",
+                             i, mesh.materials[i].textureIndex, mesh.materials[i].combinerMode,
+                             mesh.materials[i].isAlphaTested, mesh.materials[i].isWater);
+                }
+            }
+            RTX_DIAG("BuildBLAS alpha: %u materials with texIdx>0, %u with texIdx==0 (white fallback)",
+                     nonZero, zero);
+        }
 
         blasData.alphaVertexBuffer = UploadBuffer(
             mesh.vertices.data(),
@@ -737,6 +769,40 @@ void AccelerationStructure::RebuildGeometryBufferList() {
 
     SPDLOG_DEBUG("[RTX] Geometry buffer list rebuilt: {} entries across {} rooms",
                  m_geometryBuffers.size(), m_blasMap.size());
+}
+
+void AccelerationStructure::UpdateMaterialBuffers(const RoomGeometry& geometry) {
+    auto it = m_blasMap.find(geometry.roomIndex);
+    if (it == m_blasMap.end()) {
+        return; // Room not loaded yet
+    }
+
+    BLASData& blas = it->second;
+
+    // Re-upload opaque material buffer if present
+    if (blas.hasOpaqueGeometry && !geometry.opaqueMesh.materials.empty()) {
+        size_t matSize = geometry.opaqueMesh.materials.size() * sizeof(Material);
+        auto newMatBuffer = UploadBuffer(geometry.opaqueMesh.materials.data(), matSize,
+                                          D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+        if (newMatBuffer) {
+            blas.opaqueMaterialBuffer = std::move(newMatBuffer);
+        }
+    }
+
+    // Re-upload alpha material buffer if present
+    if (blas.hasAlphaGeometry && !geometry.alphaMesh.materials.empty()) {
+        size_t matSize = geometry.alphaMesh.materials.size() * sizeof(Material);
+        auto newMatBuffer = UploadBuffer(geometry.alphaMesh.materials.data(), matSize,
+                                          D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+        if (newMatBuffer) {
+            blas.alphaMaterialBuffer = std::move(newMatBuffer);
+        }
+    }
+
+    // Rebuild geometry buffer list so the shader table gets updated addresses
+    RebuildGeometryBufferList();
+
+    SPDLOG_DEBUG("[RTX] Updated material buffers for room {}", geometry.roomIndex);
 }
 
 } // namespace RTX

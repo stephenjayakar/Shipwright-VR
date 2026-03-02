@@ -27,6 +27,8 @@
 #include "soh/OTRGlobals.h"
 #include "soh/ResourceManagerHelpers.h"
 
+#include "soh/Enhancements/RTX/RTXHooks.h"
+
 // Entrance Table definition
 #define DEFINE_ENTRANCE(_0, sceneId, spawn, continueBgm, displayTitleCard, endTransType, startTransType) \
     { sceneId, spawn,                                                                                    \
@@ -1108,6 +1110,7 @@ void func_8009DE78(PlayState* play) {
 
 // Scene Draw Config 4
 void func_8009E0B8(PlayState* play) {
+
     u32 gameplayFrames;
     u8 spA3;
     u16 spA0;
@@ -1675,6 +1678,16 @@ void (*sSceneDrawHandlers[])(PlayState*) = {
 };
 
 void Scene_Draw(PlayState* play) {
+#ifdef ENABLE_DX12_RTX
+    // Central RTX hook: if RTX is active for this scene, update scene params
+    // and skip the normal GBI draw config handler entirely. This covers ALL
+    // scene draw configs (0-52) without needing individual per-config hooks.
+    if (RTX_IsActive() && RTX_IsKokiriForest(play)) {
+        RTX_UpdateSceneParams(play);
+        return;
+    }
+#endif
+
     if (HREG(80) == 17) {
         if (HREG(95) != 17) {
             HREG(95) = 17;

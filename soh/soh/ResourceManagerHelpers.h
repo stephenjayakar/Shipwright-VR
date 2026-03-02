@@ -64,6 +64,22 @@ void ResourceMgr_ClearSkeletons();
 s32* ResourceMgr_LoadCSByName(const char* path);
 int ResourceMgr_OTRSigCheck(char* imgData);
 char* ResourceMgr_GetResourceDataByNameHandlingMQ(const char* path);
+
+// RTX texture loading helper: load a texture resource and return its N64 format type.
+// Returns the raw texture image data pointer (owned by ResourceManager), or NULL on failure.
+// outType receives the Fast::TextureType enum value (1=RGBA32, 2=RGBA16, 3=CI4, 4=CI8, etc.)
+// outWidth/outHeight receive the texture dimensions.
+// outDataSize receives the size of the returned image data in bytes.
+char* ResourceMgr_LoadTexDataForRTX(const char* texPath, uint32_t* outType,
+                                     uint16_t* outWidth, uint16_t* outHeight,
+                                     uint32_t* outDataSize);
+
+// CRC-based variant: load texture data by OTR CRC hash when the path is unknown.
+// Same return semantics as ResourceMgr_LoadTexDataForRTX.
+char* ResourceMgr_LoadTexDataForRTXByCRC(uint64_t crc, uint32_t* outType,
+                                          uint16_t* outWidth, uint16_t* outHeight,
+                                          uint32_t* outDataSize);
+
 #ifdef __cplusplus
 }
 #endif // __cplusplus

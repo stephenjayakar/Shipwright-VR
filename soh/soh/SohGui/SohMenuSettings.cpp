@@ -410,6 +410,17 @@ void SohMenu::AddMenuSettings() {
 
     path.column = SECTION_COLUMN_2;
     AddWidget(path, "Advanced Graphics Options", WIDGET_SEPARATOR_TEXT);
+#ifdef ENABLE_DX12_RTX
+    AddWidget(path, "RTX Raytracing (Kokiri Forest)", WIDGET_CVAR_CHECKBOX)
+        .CVar("gEnhancements.RTX.Enabled")
+        .Options(CheckboxOptions()
+                     .Tooltip("Enables real-time raytracing for Kokiri Forest using DX12 DXR.\n"
+                              "Requires an RTX (or DXR-capable) GPU. When enabled, the Kokiri Forest\n"
+                              "scene will be rendered with raytraced lighting, shadows, and reflections\n"
+                              "instead of the standard rasterized renderer.\n\n"
+                              "If your GPU does not support DXR, this option has no effect.")
+                     .DefaultValue(true));
+#endif
 
     // Controls
     path.sidebarName = "Controls";
