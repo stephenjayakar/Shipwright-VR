@@ -7,6 +7,7 @@
 #include <cstring>
 #include <algorithm>
 #include <string>
+#include <vector>
 
 // Import the OTR resource loading function from ResourceManagerHelpers.cpp.
 // This is declared in ResourceManagerHelpers.h as extern "C".
@@ -31,6 +32,34 @@ enum OTRTextureType {
 };
 
 namespace RTX {
+
+// Texture upscale factor.
+// 1 = native N64 resolution (correct OoT look — point sampler handles sharpness).
+// >1 = nearest-neighbor upscale before upload (DO NOT USE with bilinear/point — produces
+//       smeared blurriness because bilinear smooths over the NN block edges).
+static const uint32_t TEXTURE_UPSCALE_FACTOR = 1;
+
+// ============================================================================
+// Helper: Nearest-neighbor upscale RGBA8 texture data
+// ============================================================================
+static std::vector<uint8_t> UpscaleTextureNearest(const uint8_t* src, uint32_t w, uint32_t h, uint32_t scale) {
+    uint32_t newW = w * scale;
+    uint32_t newH = h * scale;
+    std::vector<uint8_t> dst(newW * newH * 4);
+    for (uint32_t y = 0; y < newH; y++) {
+        for (uint32_t x = 0; x < newW; x++) {
+            uint32_t srcX = x / scale;
+            uint32_t srcY = y / scale;
+            uint32_t srcIdx = (srcY * w + srcX) * 4;
+            uint32_t dstIdx = (y * newW + x) * 4;
+            dst[dstIdx + 0] = src[srcIdx + 0];
+            dst[dstIdx + 1] = src[srcIdx + 1];
+            dst[dstIdx + 2] = src[srcIdx + 2];
+            dst[dstIdx + 3] = src[srcIdx + 3];
+        }
+    }
+    return dst;
+}
 
 // ============================================================================
 // Singleton
@@ -5396,7 +5425,20 @@ uint32_t TextureManager::EagerResolveOTRTexture(const char* otrPath,
     }
 
     // Upload decoded RGBA8 data to GPU via TextureManager
-    RTXTextureHandle handle = GetOrUploadTexture(rgba8.data(), otrWidth, otrHeight, pathHash);
+    // Upscale texture for sharper bilinear at high resolution
+    uint32_t uploadW = otrWidth;
+    uint32_t uploadH = otrHeight;
+    const uint8_t* uploadData = rgba8.data();
+
+    std::vector<uint8_t> upscaledData;
+    if (TEXTURE_UPSCALE_FACTOR > 1 && otrWidth > 0 && otrHeight > 0) {
+        uploadW = otrWidth * TEXTURE_UPSCALE_FACTOR;
+        uploadH = otrHeight * TEXTURE_UPSCALE_FACTOR;
+        upscaledData = UpscaleTextureNearest(rgba8.data(), otrWidth, otrHeight, TEXTURE_UPSCALE_FACTOR);
+        uploadData = upscaledData.data();
+    }
+
+    RTXTextureHandle handle = GetOrUploadTexture(uploadData, uploadW, uploadH, pathHash);
 
     if (handle.srvIndex > 0) {
         s_eagerLoadSuccesses++;

@@ -295,9 +295,7 @@ void ClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttribut
     bool hasRealTexture = (texIdx >= 3);
 
     if (texIdx > 0) {
-        // Use bilinear (linear) sampling for all textures. N64 textures are low-resolution
-        // (16x16, 32x32, etc.) but at RTX resolution bilinear filtering produces much
-        // smoother results than nearest-neighbor, eliminating blocky pixelation.
+        // Bilinear filtering on native N64-resolution textures = correct OoT look.
         texColor = g_textures[NonUniformResourceIndex(texIdx)]
                         .SampleLevel(g_samplerBilinear, uv, 0);
         // Guard against all-zero texture samples from freed/corrupted SRVs.
@@ -796,7 +794,7 @@ void AnyHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes a
     uv = ApplyWrapModes(uv, mat.wrapModeS, mat.wrapModeT,
                         (float)mat.texWidthPx, (float)mat.texHeightPx);
 
-    // Sample texture alpha using bilinear sampler for smooth alpha test edges at RTX resolution
+    // Sample texture alpha using bilinear sampler.
     float alpha = g_textures[NonUniformResourceIndex(mat.textureIndex)]
                     .SampleLevel(g_samplerBilinear, uv, 0).a;
 
@@ -808,9 +806,6 @@ void AnyHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes a
     float dekuTreeAlpha = 1.0;
     alpha *= dekuTreeAlpha;
 
-    // Alpha test threshold: use 0.4 to account for bilinear filtering and
-    // dekuTreeAlpha multiplication reducing edge alpha values slightly.
-    // See AnyHit.hlsl for detailed rationale.
     if (alpha < 0.4) {
         IgnoreHit();
     }

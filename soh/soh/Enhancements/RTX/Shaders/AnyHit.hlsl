@@ -14,8 +14,8 @@ StructuredBuffer<Material>   g_materials   : register(t3, space1);
 
 // Bindless texture array (global root signature, space0)
 Texture2D    g_textures[]       : register(t4, space0);
-SamplerState g_samplerBilinear  : register(s0);  // Bilinear wrap
-SamplerState g_samplerPoint     : register(s1);  // Point/nearest wrap (N64 pixel-art)
+SamplerState g_samplerBilinear  : register(s0);  // Bilinear wrap (water / smooth surfaces)
+SamplerState g_samplerPoint     : register(s1);  // Point/nearest wrap — OoT faithful pixel-art
 
 // SceneConstants cbuffer is already declared in Common.hlsli at register(b0)
 // No separate ConstantBuffer declaration needed.
@@ -64,23 +64,14 @@ void AnyHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes a
     uv = ApplyWrapModes(uv, mat.wrapModeS, mat.wrapModeT,
                         (float)mat.texWidthPx, (float)mat.texHeightPx);
 
-    // Sample texture alpha using bilinear sampler for smooth alpha test edges at RTX resolution.
-    // Bilinear filtering softens the alpha boundary slightly, producing smoother foliage edges
-    // that look natural at high resolution rather than jagged pixel-art cutoffs.
+    // Sample texture alpha using bilinear sampler.
+    // Bilinear on native N64-res textures is the correct OoT look at RTX resolution.
     float alpha = g_textures[NonUniformResourceIndex(mat.textureIndex)]
                     .SampleLevel(g_samplerBilinear, uv, 0).a;
 
-    // Note: dekuTreeAlpha fade is temporarily disabled in the nuclear simplified
-    // cbuffer layout. It can be re-added via a padding field once baseline is stable.
-
-    // Alpha test threshold: N64 uses 0x80/255 ≈ 0.5 as the reference value.
-    // We use 0.4 instead of 0.5 to account for:
-    // 1. Bilinear filtering reducing edge alpha slightly below the original 1.0
-    // 2. The dekuTreeAlpha multiplication — even small reductions compound
-    // 3. Some OoT textures use alpha values like 0xFE (254/255 = 0.996) for
-    //    "opaque" areas that should pass the test
-    // The 0.4 threshold preserves more foliage detail while still cleanly
-    // cutting out the transparent background (typically alpha=0).
+    // Alpha test threshold: N64 RDP uses 0x80/255 ≈ 0.5 as its reference.
+    // We use 0.4 to give a small margin for bilinear filtering, which slightly
+    // softens alpha edges on foliage textures and could clip valid opaque regions.
     if (alpha < 0.4) {
         IgnoreHit();
     }

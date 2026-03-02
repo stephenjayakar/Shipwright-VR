@@ -34,8 +34,8 @@ StructuredBuffer<Material>   g_materials   : register(t3, space1);
 
 // Bindless texture array (global root signature, space0)
 Texture2D    g_textures[]       : register(t4, space0);
-SamplerState g_samplerBilinear  : register(s0);
-SamplerState g_samplerPoint     : register(s1);
+SamplerState g_samplerBilinear  : register(s0);  // Bilinear (reserved for water / smooth surfaces)
+SamplerState g_samplerPoint     : register(s1);  // Point/nearest — OoT faithful pixel-art look
 
 [shader("closesthit")]
 void ClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes attribs) {
@@ -92,6 +92,9 @@ void ClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttribut
     bool hasRealTexture = (texIdx >= 3);
 
     if (texIdx > 0) {
+        // Bilinear filtering on native N64-resolution textures = correct OoT look at RTX resolution.
+        // (The previous blurriness was caused by bilinear being applied on top of a 4x
+        // nearest-neighbor upscale — that upscale is now disabled, so bilinear is correct.)
         texColor = g_textures[NonUniformResourceIndex(texIdx)]
                         .SampleLevel(g_samplerBilinear, uv, 0);
         if (IsCorruptedTextureSample(texColor)) {
@@ -199,9 +202,10 @@ void ClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttribut
     float shadowFactor = 1.0; // 1 = fully lit, 0 = fully shadowed
     if (NdotL > 0.001 && payload.recursionDepth < MAX_TRACE_RECURSION_DEPTH) {
         RayDesc shadowRay;
-        shadowRay.Origin = worldPos + N * 1.5; // Offset along normal to avoid self-intersection
+        float3 biasScale = max(abs(worldPos.x), max(abs(worldPos.y), abs(worldPos.z))) * 0.001;
+        shadowRay.Origin = worldPos + N * (0.01 + length(biasScale));
         shadowRay.Direction = sunDir;
-        shadowRay.TMin = 0.5;
+        shadowRay.TMin = 0.01;
         shadowRay.TMax = 200000.0;
 
         // Shadow ray payload: initialize hit=1 (assume occluded).
