@@ -1,0 +1,371 @@
+[1mdiff --git a/soh/soh/Enhancements/RTX/RTXSceneConfig.cpp b/soh/soh/Enhancements/RTX/RTXSceneConfig.cpp[m
+[1mindex 866f612..9fd62a2 100644[m
+[1m--- a/soh/soh/Enhancements/RTX/RTXSceneConfig.cpp[m
+[1m+++ b/soh/soh/Enhancements/RTX/RTXSceneConfig.cpp[m
+[36m@@ -192,7 +192,7 @@[m [mstatic void InitDefaultMaterialOverrides() {[m
+ [m
+ SceneConfig GetDefaultConfig() {[m
+     SceneConfig config = {};[m
+[31m-    config.enabled = false;[m
+[32m+[m[32m    config.enabled = true;[m
+     config.giIntensity = 0.3f;[m
+     config.maxBounces = 2;[m
+ [m
+[36m@@ -808,8 +808,220 @@[m [mSceneConfig GetSceneConfig(uint16_t sceneId) {[m
+             config.aoIntensity = 0.7f;[m
+             break;[m
+ [m
+[32m+[m[32m        // ====================================================================[m
+[32m+[m[32m        // OUTDOOR OVERWORLD SCENES[m
+[32m+[m[32m        // Bright daylight, white sun, cool blue ambient, wide fog[m
+[32m+[m[32m        // ====================================================================[m
+[32m+[m[32m        case SCENE_KAKARIKO_VILLAGE:        // 0x52[m
+[32m+[m[32m        case SCENE_GRAVEYARD:               // 0x53[m
+[32m+[m[32m        case SCENE_LAKE_HYLIA:              // 0x57[m
+[32m+[m[32m        case SCENE_ZORAS_FOUNTAIN:          // 0x59[m
+[32m+[m[32m        case SCENE_GERUDO_VALLEY:           // 0x5A[m
+[32m+[m[32m        case SCENE_DESERT_COLOSSUS:         // 0x5C[m
+[32m+[m[32m        case SCENE_GERUDOS_FORTRESS:        // 0x5D[m
+[32m+[m[32m        case SCENE_HAUNTED_WASTELAND:       // 0x5E[m
+[32m+[m[32m        case SCENE_HYRULE_CASTLE:           // 0x5F[m
+[32m+[m[32m        case SCENE_DEATH_MOUNTAIN_TRAIL:    // 0x60[m
+[32m+[m[32m        case SCENE_DEATH_MOUNTAIN_CRATER:   // 0x61[m
+[32m+[m[32m        case SCENE_GORON_CITY:              // 0x62[m
+[32m+[m[32m        case SCENE_LON_LON_RANCH:           // 0x63[m
+[32m+[m[32m        case SCENE_OUTSIDE_GANONS_CASTLE:   // 0x64[m
+[32m+[m[32m        case SCENE_MARKET_ENTRANCE_DAY:     // 0x1B[m
+[32m+[m[32m        case SCENE_MARKET_ENTRANCE_NIGHT:   // 0x1C[m
+[32m+[m[32m        case SCENE_MARKET_ENTRANCE_RUINS:   // 0x1D[m
+[32m+[m[32m        case SCENE_BACK_ALLEY_DAY:          // 0x1E[m
+[32m+[m[32m        case SCENE_BACK_ALLEY_NIGHT:        // 0x1F[m
+[32m+[m[32m        case SCENE_MARKET_DAY:              // 0x20[m
+[32m+[m[32m        case SCENE_MARKET_NIGHT:            // 0x21[m
+[32m+[m[32m        case SCENE_MARKET_RUINS:            // 0x22[m
+[32m+[m[32m        case SCENE_TEMPLE_OF_TIME_EXTERIOR_DAY:    // 0x23[m
+[32m+[m[32m        case SCENE_TEMPLE_OF_TIME_EXTERIOR_NIGHT:  // 0x24[m
+[32m+[m[32m        case SCENE_TEMPLE_OF_TIME_EXTERIOR_RUINS:  // 0x25[m
+[32m+[m[32m        case SCENE_CASTLE_COURTYARD_GUARDS_DAY:    // 0x45[m
+[32m+[m[32m        case SCENE_CASTLE_COURTYARD_GUARDS_NIGHT:  // 0x46[m
+[32m+[m[32m        case SCENE_CASTLE_COURTYARD_ZELDA:         // 0x4A[m
+[32m+[m[32m        case SCENE_HAIRAL_NIWA2:                   // 0x6B[m
+[32m+[m[32m            config.enabled = true;[m
+[32m+[m[32m            config.giIntensity = 0.3f;[m
+[32m+[m[32m            config.maxBounces = 2;[m
+[32m+[m[32m            config.skyColor[0] = 0.4f; config.skyColor[1] = 0.6f; config.skyColor[2] = 1.0f;[m
+[32m+[m[32m            config.skyHorizonColor[0] = 0.7f; config.skyHorizonColor[1] = 0.75f; config.skyHorizonColor[2] = 0.8f;[m
+[32m+[m[32m            config.sunDirection[0] = 0.5145f; config.sunDirection[1] = 0.8232f; config.sunDirection[2] = 0.3087f;[m
+[32m+[m[32m            config.sunIntensity = 1.8f;[m
+[32m+[m[32m            config.sunColor[0] = 1.0f; config.sunColor[1] = 1.0f; config.sunColor[2] = 1.0f;[m
+[32m+[m[32m            config.ambientColor[0] = 0.25f; config.ambientColor[1] = 0.30f; config.ambientColor[2] = 0.50f;[m
+[32m+[m[32m            config.ambientIntensity = 0.35f;[m
+[32m+[m[32m            config.fogColorDefault[0] = 0.50f; config.fogColorDefault[1] = 0.55f; config.fogColorDefault[2] = 0.85f;[m
+[32m+[m[32m            config.fogNearDefault = 8000.0f; config.fogFarDefault = 25000.0f; config.fogDensity = 0.4f;[m
+[32m+[m[32m            config.probeDensity = 300.0f; config.probeRadius = 500.0f;[m
+[32m+[m[32m            config.baseReflectivity = 0.04f; config.roughnessScale = 1.0f; config.emissiveScale = 0.4f;[m
+[32m+[m[32m            config.reflectionQuality = 0.6f; config.waterReflectivity = 0.5f; config.waterRoughness = 0.15f;[m
+[32m+[m[32m            config.aoRadius = 40.0f; config.aoIntensity = 0.35f;[m
+[32m+[m[32m            config.ambientMinIntensity = 0.10f;[m
+[32m+[m[32m            config.exposure = 1.0f; config.toneMapMode = 0;[m
+[32m+[m[32m            break;[m
+[32m+[m
+[32m+[m[32m        // ====================================================================[m
+[32m+[m[32m        // INDOOR SCENES — small interiors, houses, shops[m
+[32m+[m[32m        // Warm enclosed lighting, short fog range, strong AO[m
+[32m+[m[32m        // ====================================================================[m
+[32m+[m[32m        case SCENE_KNOW_IT_ALL_BROS_HOUSE:  // 0x26[m
+[32m+[m[32m        case SCENE_TWINS_HOUSE:             // 0x27[m
+[32m+[m[32m        case SCENE_MIDOS_HOUSE:             // 0x28[m
+[32m+[m[32m        case SCENE_SARIAS_HOUSE:            // 0x29[m
+[32m+[m[32m        case SCENE_KAKARIKO_CENTER_GUEST_HOUSE: // 0x2A[m
+[32m+[m[32m        case SCENE_BACK_ALLEY_HOUSE:        // 0x2B[m
+[32m+[m[32m        case SCENE_BAZAAR:                  // 0x2C[m
+[32m+[m[32m        case SCENE_GORON_SHOP:              // 0x2E[m
+[32m+[m[32m        case SCENE_ZORA_SHOP:              // 0x2F[m
+[32m+[m[32m        case SCENE_POTION_SHOP_KAKARIKO:    // 0x30[m
+[32m+[m[32m        case SCENE_POTION_SHOP_MARKET:      // 0x31[m
+[32m+[m[32m        case SCENE_BOMBCHU_SHOP:            // 0x32[m
+[32m+[m[32m        case SCENE_HAPPY_MASK_SHOP:         // 0x33[m
+[32m+[m[32m        case SCENE_DOG_LADY_HOUSE:          // 0x35[m
+[32m+[m[32m        case SCENE_STABLE:                  // 0x36[m
+[32m+[m[32m        case SCENE_IMPAS_HOUSE:             // 0x37[m
+[32m+[m[32m        case SCENE_LAKESIDE_LABORATORY:     // 0x38[m
+[32m+[m[32m        case SCENE_CARPENTERS_TENT:         // 0x39[m
+[32m+[m[32m        case SCENE_GRAVEKEEPERS_HUT:        // 0x3A[m
+[32m+[m[32m        case SCENE_SHOOTING_GALLERY:        // 0x42[m
+[32m+[m[32m        case SCENE_MARKET_GUARD_HOUSE:      // 0x4D[m
+[32m+[m[32m        case SCENE_POTION_SHOP_GRANNY:      // 0x4E[m
+[32m+[m[32m        case SCENE_HOUSE_OF_SKULLTULA:      // 0x50[m
+[32m+[m[32m        case SCENE_TREASURE_BOX_SHOP:       // 0x10[m
+[32m+[m[32m        case SCENE_LON_LON_BUILDINGS:       // 0x4C[m
+[32m+[m[32m        case SCENE_BOMBCHU_BOWLING_ALLEY:   // 0x4B[m
+[32m+[m[32m        case SCENE_FISHING_POND:            // 0x49[m
+[32m+[m[32m        case SCENE_WINDMILL_AND_DAMPES_GRAVE: // 0x48[m
+[32m+[m[32m            config.enabled = true;[m
+[32m+[m[32m            config.giIntensity = 1.2f;[m
+[32m+[m[32m            config.maxBounces = 3;[m
+[32m+[m[32m            config.skyColor[0] = 0.3f; config.skyColor[1] = 0.25f; config.skyColor[2] = 0.2f;[m
+[32m+[m[32m            config.skyHorizonColor[0] = 0.3f; config.skyHorizonColor[1] = 0.25f; config.skyHorizonColor[2] = 0.2f;[m
+[32m+[m[32m            config.sunDirection[0] = 0.0f; config.sunDirection[1] = 1.0f; config.sunDirection[2] = 0.0f;[m
+[32m+[m[32m            config.sunIntensity = 1.5f;[m
+[32m+[m[32m            config.sunColor[0] = 1.0f; config.sunColor[1] = 0.95f; config.sunColor[2] = 0.85f;[m
+[32m+[m[32m            config.ambientColor[0] = 0.20f; config.ambientColor[1] = 0.18f; config.ambientColor[2] = 0.15f;[m
+[32m+[m[32m            config.ambientIntensity = 0.6f;[m
+[32m+[m[32m            config.fogColorDefault[0] = 0.25f; config.fogColorDefault[1] = 0.22f; config.fogColorDefault[2] = 0.18f;[m
+[32m+[m[32m            config.fogNearDefault = 800.0f; config.fogFarDefault = 3000.0f; config.fogDensity = 1.0f;[m
+[32m+[m[32m            config.probeDensity = 80.0f; config.probeRadius = 120.0f;[m
+[32m+[m[32m            config.baseReflectivity = 0.04f; config.roughnessScale = 0.9f; config.emissiveScale = 1.2f;[m
+[32m+[m[32m            config.reflectionQuality = 0.7f; config.waterReflectivity = 0.3f; config.waterRoughness = 0.3f;[m
+[32m+[m[32m            config.aoRadius = 25.0f; config.aoIntensity = 0.85f;[m
+[32m+[m[32m            config.ambientMinIntensity = 0.12f;[m
+[32m+[m[32m            config.exposure = 1.1f; config.toneMapMode = 0;[m
+[32m+[m[32m            break;[m
+[32m+[m
+[32m+[m[32m        // ====================================================================[m
+[32m+[m[32m        // DUNGEONS — dark underground, tight geometry, strong AO[m
+[32m+[m[32m        // ====================================================================[m
+[32m+[m[32m        case SCENE_DODONGOS_CAVERN:         // 0x01[m
+[32m+[m[32m        case SCENE_JABU_JABU:              // 0x02[m
+[32m+[m[32m        case SCENE_FOREST_TEMPLE:           // 0x03[m
+[32m+[m[32m        case SCENE_FIRE_TEMPLE:             // 0x04[m
+[32m+[m[32m        case SCENE_WATER_TEMPLE:            // 0x05[m
+[32m+[m[32m        case SCENE_SPIRIT_TEMPLE:           // 0x06[m
+[32m+[m[32m        case SCENE_SHADOW_TEMPLE:           // 0x07[m
+[32m+[m[32m        case SCENE_BOTTOM_OF_THE_WELL:      // 0x08[m
+[32m+[m[32m        case SCENE_ICE_CAVERN:              // 0x09[m
+[32m+[m[32m        case SCENE_GANONS_TOWER:            // 0x0A[m
+[32m+[m[32m        case SCENE_GERUDO_TRAINING_GROUND:  // 0x0B[m
+[32m+[m[32m        case SCENE_THIEVES_HIDEOUT:         // 0x0C[m
+[32m+[m[32m        case SCENE_INSIDE_GANONS_CASTLE:    // 0x0D[m
+[32m+[m[32m        case SCENE_INSIDE_GANONS_CASTLE_COLLAPSE: // 0x0F[m
+[32m+[m[32m        case SCENE_GROTTOS:                 // 0x3E[m
+[32m+[m[32m        case SCENE_REDEAD_GRAVE:            // 0x3F[m
+[32m+[m[32m        case SCENE_GRAVE_WITH_FAIRYS_FOUNTAIN: // 0x40[m
+[32m+[m[32m        case SCENE_ROYAL_FAMILYS_TOMB:      // 0x41[m
+[32m+[m[32m            config.enabled = true;[m
+[32m+[m[32m            config.giIntensity = 0.8f;[m
+[32m+[m[32m            config.maxBounces = 2;[m
+[32m+[m[32m            config.skyColor[0] = 0.05f; config.skyColor[1] = 0.05f; config.skyColor[2] = 0.08f;[m
+[32m+[m[32m            config.skyHorizonColor[0] = 0.05f; config.skyHorizonColor[1] = 0.05f; config.skyHorizonColor[2] = 0.08f;[m
+[32m+[m[32m            config.sunDirection[0] = 0.0f; config.sunDirection[1] = 1.0f; config.sunDirection[2] = 0.0f;[m
+[32m+[m[32m            config.sunIntensity = 1.2f;[m
+[32m+[m[32m            config.sunColor[0] = 0.9f; config.sunColor[1] = 0.85f; config.sunColor[2] = 0.7f;[m
+[32m+[m[32m            config.ambientColor[0] = 0.12f; config.ambientColor[1] = 0.10f; config.ambientColor[2] = 0.15f;[m
+[32m+[m[32m            config.ambientIntensity = 0.5f;[m
+[32m+[m[32m            config.fogColorDefault[0] = 0.05f; config.fogColorDefault[1] = 0.05f; config.fogColorDefault[2] = 0.08f;[m
+[32m+[m[32m            config.fogNearDefault = 500.0f; config.fogFarDefault = 3000.0f; config.fogDensity = 1.2f;[m
+[32m+[m[32m            config.probeDensity = 100.0f; config.probeRadius = 150.0f;[m
+[32m+[m[32m            config.baseReflectivity = 0.04f; config.roughnessScale = 1.2f; config.emissiveScale = 0.8f;[m
+[32m+[m[32m            config.reflectionQuality = 0.6f; config.waterReflectivity = 0.6f; config.waterRoughness = 0.08f;[m
+[32m+[m[32m            config.aoRadius = 50.0f; config.aoIntensity = 1.0f;[m
+[32m+[m[32m            config.ambientMinIntensity = 0.06f;[m
+[32m+[m[32m            config.exposure = 1.2f; config.toneMapMode = 0;[m
+[32m+[m[32m            break;[m
+[32m+[m
+[32m+[m[32m        // ====================================================================[m
+[32m+[m[32m        // BOSS ROOMS[m
+[32m+[m[32m        // ====================================================================[m
+[32m+[m[32m        case SCENE_DEKU_TREE_BOSS:          // 0x11[m
+[32m+[m[32m        case SCENE_DODONGOS_CAVERN_BOSS:    // 0x12[m
+[32m+[m[32m        case SCENE_JABU_JABU_BOSS:          // 0x13[m
+[32m+[m[32m        case SCENE_FOREST_TEMPLE_BOSS:      // 0x14[m
+[32m+[m[32m        case SCENE_FIRE_TEMPLE_BOSS:        // 0x15[m
+[32m+[m[32m        case SCENE_WATER_TEMPLE_BOSS:       // 0x16[m
+[32m+[m[32m        case SCENE_SPIRIT_TEMPLE_BOSS:      // 0x17[m
+[32m+[m[32m        case SCENE_SHADOW_TEMPLE_BOSS:      // 0x18[m
+[32m+[m[32m        case SCENE_GANONDORF_BOSS:          // 0x19[m
+[32m+[m[32m        case SCENE_GANON_BOSS:              // 0x4F[m
+[32m+[m[32m            config.enabled = true;[m
+[32m+[m[32m            config.giIntensity = 0.6f;[m
+[32m+[m[32m            config.maxBounces = 2;[m
+[32m+[m[32m            config.skyColor[0] = 0.05f; config.skyColor[1] = 0.02f; config.skyColor[2] = 0.02f;[m
+[32m+[m[32m            config.skyHorizonColor[0] = 0.08f; config.skyHorizonColor[1] = 0.03f; config.skyHorizonColor[2] = 0.03f;[m
+[32m+[m[32m            config.sunDirection[0] = 0.0f; config.sunDirection[1] = 1.0f; config.sunDirection[2] = 0.0f;[m
+[32m+[m[32m            config.sunIntensity = 1.5f;[m
+[32m+[m[32m            config.sunColor[0] = 1.0f; config.sunColor[1] = 0.7f; config.sunColor[2] = 0.5f;[m
+[32m+[m[32m            config.ambientColor[0] = 0.15f; config.ambientColor[1] = 0.08f; config.ambientColor[2] = 0.08f;[m
+[32m+[m[32m            config.ambientIntensity = 0.4f;[m
+[32m+[m[32m            config.fogColorDefault[0] = 0.06f; config.fogColorDefault[1] = 0.02f; config.fogColorDefault[2] = 0.02f;[m
+[32m+[m[32m            config.fogNearDefault = 400.0f; config.fogFarDefault = 2500.0f; config.fogDensity = 1.3f;[m
+[32m+[m[32m            config.probeDensity = 120.0f; config.probeRadius = 180.0f;[m
+[32m+[m[32m            config.baseReflectivity = 0.05f; config.roughnessScale = 1.0f; config.emissiveScale = 1.0f;[m
+[32m+[m[32m            config.reflectionQuality = 0.7f; config.waterReflectivity = 0.4f; config.waterRoughness = 0.2f;[m
+[32m+[m[32m            config.aoRadius = 45.0f; config.aoIntensity = 0.9f;[m
+[32m+[m[32m            config.ambientMinIntensity = 0.05f;[m
+[32m+[m[32m            config.exposure = 1.3f; config.toneMapMode = 0;[m
+[32m+[m[32m            break;[m
+[32m+[m
+[32m+[m[32m        // ====================================================================[m
+[32m+[m[32m        // SPECIAL / FAIRY FOUNTAINS / SACRED SPACES[m
+[32m+[m[32m        // ====================================================================[m
+[32m+[m[32m        case SCENE_GREAT_FAIRYS_FOUNTAIN_MAGIC:   // 0x3B[m
+[32m+[m[32m        case SCENE_FAIRYS_FOUNTAIN:               // 0x3C[m
+[32m+[m[32m        case SCENE_GREAT_FAIRYS_FOUNTAIN_SPELLS:  // 0x3D[m
+[32m+[m[32m        case SCENE_CHAMBER_OF_THE_SAGES:          // 0x44[m
+[32m+[m[32m        case SCENE_CUTSCENE_MAP:                  // 0x47[m
+[32m+[m[32m        case SCENE_GANONS_TOWER_COLLAPSE_INTERIOR:   // 0x0E[m
+[32m+[m[32m        case SCENE_GANONS_TOWER_COLLAPSE_EXTERIOR:   // 0x1A[m
+[32m+[m[32m            config.enabled = true;[m
+[32m+[m[32m            config.giIntensity = 1.0f;[m
+[32m+[m[32m            config.maxBounces = 3;[m
+[32m+[m[32m            config.skyColor[0] = 0.2f; config.skyColor[1] = 0.3f; config.skyColor[2] = 0.5f;[m
+[32m+[m[32m            config.skyHorizonColor[0] = 0.3f; config.skyHorizonColor[1] = 0.4f; config.skyHorizonColor[2] = 0.6f;[m
+[32m+[m[32m            config.sunDirection[0] = 0.0f; config.sunDirection[1] = 1.0f; config.sunDirection[2] = 0.0f;[m
+[32m+[m[32m            config.sunIntensity = 1.2f;[m
+[32m+[m[32m            config.sunColor[0] = 0.8f; config.sunColor[1] = 0.9f; config.sunColor[2] = 1.0f;[m
+[32m+[m[32m            config.ambientColor[0] = 0.2f; config.ambientColor[1] = 0.25f; config.ambientColor[2] = 0.4f;[m
+[32m+[m[32m            config.ambientIntensity = 0.7f;[m
+[32m+[m[32m            config.fogColorDefault[0] = 0.15f; config.fogColorDefault[1] = 0.2f; config.fogColorDefault[2] = 0.35f;[m
+[32m+[m[32m            config.fogNearDefault = 600.0f; config.fogFarDefault = 2500.0f; config.fogDensity = 0.8f;[m
+[32m+[m[32m            config.probeDensity = 100.0f; config.probeRadius = 150.0f;[m
+[32m+[m[32m            config.baseReflectivity = 0.06f; config.roughnessScale = 0.7f; config.emissiveScale = 1.5f;[m
+[32m+[m[32m            config.reflectionQuality = 1.0f; config.waterReflectivity = 0.8f; config.waterRoughness = 0.03f;[m
+[32m+[m[32m            config.aoRadius = 35.0f; config.aoIntensity = 0.6f;[m
+[32m+[m[32m            config.ambientMinIntensity = 0.15f;[m
+[32m+[m[32m            config.exposure = 1.0f; config.toneMapMode = 0;[m
+[32m+[m[32m            break;[m
+[32m+[m
+[32m+[m[32m        // ====================================================================[m
+[32m+[m[32m        // EVERYTHING ELSE — enable with safe neutral defaults[m
+[32m+[m[32m        // ====================================================================[m
+         default:[m
+[31m-            // RTX not enabled for this scene[m
+[32m+[m[32m            config.enabled = true;[m
+             break;[m
+     }[m
+ [m
+[36m@@ -1101,7 +1313,7 @@[m [mSceneConfig LoadSceneConfigFromFile(uint16_t sceneId, const std::string& configP[m
+ [m
+     FILE* f = fopen(path.c_str(), "r");[m
+     if (!f) {[m
+[31m-        // File doesn't exist; return default config (with enabled=false for non-RTX scenes)[m
+[32m+[m[32m        // File doesn't exist; return default config.[m
+         return config;[m
+     }[m
+ [m
+[1mdiff --git a/soh/soh/Enhancements/RTX/RTXSceneConfig.h b/soh/soh/Enhancements/RTX/RTXSceneConfig.h[m
+[1mindex 56cdce2..c2f7a5a 100644[m
+[1m--- a/soh/soh/Enhancements/RTX/RTXSceneConfig.h[m
+[1m+++ b/soh/soh/Enhancements/RTX/RTXSceneConfig.h[m
+[36m@@ -10,19 +10,109 @@[m
+ [m
+ namespace RTX {[m
+ [m
+[31m-// Scene IDs from OoT (z64scene.h).[m
+[31m-// RTX-enabled scenes: Kokiri Forest, Hyrule Field, Zora's Domain, Zora's River.[m
+[31m-// The remaining scenes are listed for future expansion and scene-transition logic.[m
+[31m-constexpr uint16_t SCENE_KOKIRI_FOREST     = 0x55;[m
+[31m-constexpr uint16_t SCENE_HYRULE_FIELD      = 0x51;[m
+[31m-constexpr uint16_t SCENE_ZORAS_RIVER       = 0x54;[m
+[31m-constexpr uint16_t SCENE_ZORAS_DOMAIN      = 0x58;[m
+[31m-constexpr uint16_t SCENE_LOST_WOODS        = 0x5B;[m
+[31m-constexpr uint16_t SCENE_SACRED_FOREST_MEADOW = 0x56;[m
+[31m-constexpr uint16_t SCENE_KOKIRI_SHOP       = 0x2D;[m
+[31m-constexpr uint16_t SCENE_LINKS_HOUSE       = 0x34;[m
+[31m-constexpr uint16_t SCENE_DEKU_TREE         = 0x00;[m
+[31m-constexpr uint16_t SCENE_TEMPLE_OF_TIME    = 0x43;[m
+[32m+[m[32m// Scene IDs from OoT (z64scene.h) — all scenes.[m
+[32m+[m[32mconstexpr uint16_t SCENE_DEKU_TREE                          = 0x00;[m
+[32m+[m[32mconstexpr uint16_t SCENE_DODONGOS_CAVERN                    = 0x01;[m
+[32m+[m[32mconstexpr uint16_t SCENE_JABU_JABU                          = 0x02;[m
+[32m+[m[32mconstexpr uint16_t SCENE_FOREST_TEMPLE                      = 0x03;[m
+[32m+[m[32mconstexpr uint16_t SCENE_FIRE_TEMPLE                        = 0x04;[m
+[32m+[m[32mconstexpr uint16_t SCENE_WATER_TEMPLE                       = 0x05;[m
+[32m+[m[32mconstexpr uint16_t SCENE_SPIRIT_TEMPLE                      = 0x06;[m
+[32m+[m[32mconstexpr uint16_t SCENE_SHADOW_TEMPLE                      = 0x07;[m
+[32m+[m[32mconstexpr uint16_t SCENE_BOTTOM_OF_THE_WELL                 = 0x08;[m
+[32m+[m[32mconstexpr uint16_t SCENE_ICE_CAVERN                         = 0x09;[m
+[32m+[m[32mconstexpr uint16_t SCENE_GANONS_TOWER                       = 0x0A;[m
+[32m+[m[32mconstexpr uint16_t SCENE_GERUDO_TRAINING_GROUND             = 0x0B;[m
+[32m+[m[32mconstexpr uint16_t SCENE_THIEVES_HIDEOUT                    = 0x0C;[m
+[32m+[m[32mconstexpr uint16_t SCENE_INSIDE_GANONS_CASTLE               = 0x0D;[m
+[32m+[m[32mconstexpr uint16_t SCENE_GANONS_TOWER_COLLAPSE_INTERIOR     = 0x0E;[m
+[32m+[m[32mconstexpr uint16_t SCENE_INSIDE_GANONS_CASTLE_COLLAPSE      = 0x0F;[m
+[32m+[m[32mconstexpr uint16_t SCENE_TREASURE_BOX_SHOP                  = 0x10;[m
+[32m+[m[32mconstexpr uint16_t SCENE_DEKU_TREE_BOSS                     = 0x11;[m
+[32m+[m[32mconstexpr uint16_t SCENE_DODONGOS_CAVERN_BOSS               = 0x12;[m
+[32m+[m[32mconstexpr uint16_t SCENE_JABU_JABU_BOSS                     = 0x13;[m
+[32m+[m[32mconstexpr uint16_t SCENE_FOREST_TEMPLE_BOSS                 = 0x14;[m
+[32m+[m[32mconstexpr uint16_t SCENE_FIRE_TEMPLE_BOSS                   = 0x15;[m
+[32m+[m[32mconstexpr uint16_t SCENE_WATER_TEMPLE_BOSS                  = 0x16;[m
+[32m+[m[32mconstexpr uint16_t SCENE_SPIRIT_TEMPLE_BOSS                 = 0x17;[m
+[32m+[m[32mconstexpr uint16_t SCENE_SHADOW_TEMPLE_BOSS                 = 0x18;[m
+[32m+[m[32mconstexpr uint16_t SCENE_GANONDORF_BOSS                     = 0x19;[m
+[32m+[m[32mconstexpr uint16_t SCENE_GANONS_TOWER_COLLAPSE_EXTERIOR     = 0x1A;[m
+[32m+[m[32mconstexpr uint16_t SCENE_MARKET_ENTRANCE_DAY                = 0x1B;[m
+[32m+[m[32mconstexpr uint16_t SCENE_MARKET_ENTRANCE_NIGHT              = 0x1C;[m
+[32m+[m[32mconstexpr uint16_t SCENE_MARKET_ENTRANCE_RUINS              = 0x1D;[m
+[32m+[m[32mconstexpr uint16_t SCENE_BACK_ALLEY_DAY                     = 0x1E;[m
+[32m+[m[32mconstexpr uint16_t SCENE_BACK_ALLEY_NIGHT                   = 0x1F;[m
+[32m+[m[32mconstexpr uint16_t SCENE_MARKET_DAY                         = 0x20;[m
+[32m+[m[32mconstexpr uint16_t SCENE_MARKET_NIGHT                       = 0x21;[m
+[32m+[m[32mconstexpr uint16_t SCENE_MARKET_RUINS                       = 0x22;[m
+[32m+[m[32mconstexpr uint16_t SCENE_TEMPLE_OF_TIME_EXTERIOR_DAY        = 0x23;[m
+[32m+[m[32mconstexpr uint16_t SCENE_TEMPLE_OF_TIME_EXTERIOR_NIGHT      = 0x24;[m
+[32m+[m[32mconstexpr uint16_t SCENE_TEMPLE_OF_TIME_EXTERIOR_RUINS      = 0x25;[m
+[32m+[m[32mconstexpr uint16_t SCENE_KNOW_IT_ALL_BROS_HOUSE             = 0x26;[m
+[32m+[m[32mconstexpr uint16_t SCENE_TWINS_HOUSE                        = 0x27;[m
+[32m+[m[32mconstexpr uint16_t SCENE_MIDOS_HOUSE                        = 0x28;[m
+[32m+[m[32mconstexpr uint16_t SCENE_SARIAS_HOUSE                       = 0x29;[m
+[32m+[m[32mconstexpr uint16_t SCENE_KAKARIKO_CENTER_GUEST_HOUSE        = 0x2A;[m
+[32m+[m[32mconstexpr uint16_t SCENE_BACK_ALLEY_HOUSE                   = 0x2B;[m
+[32m+[m[32mconstexpr uint16_t SCENE_BAZAAR                             = 0x2C;[m
+[32m+[m[32mconstexpr uint16_t SCENE_KOKIRI_SHOP                        = 0x2D;[m
+[32m+[m[32mconstexpr uint16_t SCENE_GORON_SHOP                         = 0x2E;[m
+[32m+[m[32mconstexpr uint16_t SCENE_ZORA_SHOP                          = 0x2F;[m
+[32m+[m[32mconstexpr uint16_t SCENE_POTION_SHOP_KAKARIKO               = 0x30;[m
+[32m+[m[32mconstexpr uint16_t SCENE_POTION_SHOP_MARKET                 = 0x31;[m
+[32m+[m[32mconstexpr uint16_t SCENE_BOMBCHU_SHOP                       = 0x32;[m
+[32m+[m[32mconstexpr uint16_t SCENE_HAPPY_MASK_SHOP                    = 0x33;[m
+[32m+[m[32mconstexpr uint16_t SCENE_LINKS_HOUSE                        = 0x34;[m
+[32m+[m[32mconstexpr uint16_t SCENE_DOG_LADY_HOUSE                     = 0x35;[m
+[32m+[m[32mconstexpr uint16_t SCENE_STABLE                             = 0x36;[m
+[32m+[m[32mconstexpr uint16_t SCENE_IMPAS_HOUSE                        = 0x37;[m
+[32m+[m[32mconstexpr uint16_t SCENE_LAKESIDE_LABORATORY                = 0x38;[m
+[32m+[m[32mconstexpr uint16_t SCENE_CARPENTERS_TENT                    = 0x39;[m
+[32m+[m[32mconstexpr uint16_t SCENE_GRAVEKEEPERS_HUT                   = 0x3A;[m
+[32m+[m[32mconstexpr uint16_t SCENE_GREAT_FAIRYS_FOUNTAIN_MAGIC        = 0x3B;[m
+[32m+[m[32mconstexpr uint16_t SCENE_FAIRYS_FOUNTAIN                    = 0x3C;[m
+[32m+[m[32mconstexpr uint16_t SCENE_GREAT_FAIRYS_FOUNTAIN_SPELLS       = 0x3D;[m
+[32m+[m[32mconstexpr uint16_t SCENE_GROTTOS                            = 0x3E;[m
+[32m+[m[32mconstexpr uint16_t SCENE_REDEAD_GRAVE                       = 0x3F;[m
+[32m+[m[32mconstexpr uint16_t SCENE_GRAVE_WITH_FAIRYS_FOUNTAIN         = 0x40;[m
+[32m+[m[32mconstexpr uint16_t SCENE_ROYAL_FAMILYS_TOMB                 = 0x41;[m
+[32m+[m[32mconstexpr uint16_t SCENE_SHOOTING_GALLERY                   = 0x42;[m
+[32m+[m[32mconstexpr uint16_t SCENE_TEMPLE_OF_TIME                     = 0x43;[m
+[32m+[m[32mconstexpr uint16_t SCENE_CHAMBER_OF_THE_SAGES               = 0x44;[m
+[32m+[m[32mconstexpr uint16_t SCENE_CASTLE_COURTYARD_GUARDS_DAY        = 0x45;[m
+[32m+[m[32mconstexpr uint16_t SCENE_CASTLE_COURTYARD_GUARDS_NIGHT      = 0x46;[m
+[32m+[m[32mconstexpr uint16_t SCENE_CUTSCENE_MAP                       = 0x47;[m
+[32m+[m[32mconstexpr uint16_t SCENE_WINDMILL_AND_DAMPES_GRAVE          = 0x48;[m
+[32m+[m[32mconstexpr uint16_t SCENE_FISHING_POND                       = 0x49;[m
+[32m+[m[32mconstexpr uint16_t SCENE_CASTLE_COURTYARD_ZELDA             = 0x4A;[m
+[32m+[m[32mconstexpr uint16_t SCENE_BOMBCHU_BOWLING_ALLEY              = 0x4B;[m
+[32m+[m[32mconstexpr uint16_t SCENE_LON_LON_BUILDINGS                  = 0x4C;[m
+[32m+[m[32mconstexpr uint16_t SCENE_MARKET_GUARD_HOUSE                 = 0x4D;[m
+[32m+[m[32mconstexpr uint16_t SCENE_POTION_SHOP_GRANNY                 = 0x4E;[m
+[32m+[m[32mconstexpr uint16_t SCENE_GANON_BOSS                         = 0x4F;[m
+[32m+[m[32mconstexpr uint16_t SCENE_HOUSE_OF_SKULLTULA                 = 0x50;[m
+[32m+[m[32mconstexpr uint16_t SCENE_HYRULE_FIELD                       = 0x51;[m
+[32m+[m[32mconstexpr uint16_t SCENE_KAKARIKO_VILLAGE                   = 0x52;[m
+[32m+[m[32mconstexpr uint16_t SCENE_GRAVEYARD                          = 0x53;[m
+[32m+[m[32mconstexpr uint16_t SCENE_ZORAS_RIVER                        = 0x54;[m
+[32m+[m[32mconstexpr uint16_t SCENE_KOKIRI_FOREST                      = 0x55;[m
+[32m+[m[32mconstexpr uint16_t SCENE_SACRED_FOREST_MEADOW               = 0x56;[m
+[32m+[m[32mconstexpr uint16_t SCENE_LAKE_HYLIA                         = 0x57;[m
+[32m+[m[32mconstexpr uint16_t SCENE_ZORAS_DOMAIN                       = 0x58;[m
+[32m+[m[32mconstexpr uint16_t SCENE_ZORAS_FOUNTAIN                     = 0x59;[m
+[32m+[m[32mconstexpr uint16_t SCENE_GERUDO_VALLEY                      = 0x5A;[m
+[32m+[m[32mconstexpr uint16_t SCENE_LOST_WOODS                         = 0x5B;[m
+[32m+[m[32mconstexpr uint16_t SCENE_DESERT_COLOSSUS                    = 0x5C;[m
+[32m+[m[32mconstexpr uint16_t SCENE_GERUDOS_FORTRESS                   = 0x5D;[m
+[32m+[m[32mconstexpr uint16_t SCENE_HAUNTED_WASTELAND                  = 0x5E;[m
+[32m+[m[32mconstexpr uint16_t SCENE_HYRULE_CASTLE                      = 0x5F;[m
+[32m+[m[32mconstexpr uint16_t SCENE_DEATH_MOUNTAIN_TRAIL               = 0x60;[m
+[32m+[m[32mconstexpr uint16_t SCENE_DEATH_MOUNTAIN_CRATER              = 0x61;[m
+[32m+[m[32mconstexpr uint16_t SCENE_GORON_CITY                         = 0x62;[m
+[32m+[m[32mconstexpr uint16_t SCENE_LON_LON_RANCH                      = 0x63;[m
+[32m+[m[32mconstexpr uint16_t SCENE_OUTSIDE_GANONS_CASTLE              = 0x64;[m
+[32m+[m[32mconstexpr uint16_t SCENE_HAIRAL_NIWA2                       = 0x6B;[m
+ [m
+ // ============================================================================[m
+ // RTXMaterialOverride — Per-texture material property overrides.[m

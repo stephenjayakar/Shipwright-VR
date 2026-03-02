@@ -192,7 +192,7 @@ static void InitDefaultMaterialOverrides() {
 
 SceneConfig GetDefaultConfig() {
     SceneConfig config = {};
-    config.enabled = false;
+    config.enabled = true;
     config.giIntensity = 0.3f;
     config.maxBounces = 2;
 
@@ -808,8 +808,220 @@ SceneConfig GetSceneConfig(uint16_t sceneId) {
             config.aoIntensity = 0.7f;
             break;
 
+        // ====================================================================
+        // OUTDOOR OVERWORLD SCENES
+        // Bright daylight, white sun, cool blue ambient, wide fog
+        // ====================================================================
+        case SCENE_KAKARIKO_VILLAGE:        // 0x52
+        case SCENE_GRAVEYARD:               // 0x53
+        case SCENE_LAKE_HYLIA:              // 0x57
+        case SCENE_ZORAS_FOUNTAIN:          // 0x59
+        case SCENE_GERUDO_VALLEY:           // 0x5A
+        case SCENE_DESERT_COLOSSUS:         // 0x5C
+        case SCENE_GERUDOS_FORTRESS:        // 0x5D
+        case SCENE_HAUNTED_WASTELAND:       // 0x5E
+        case SCENE_HYRULE_CASTLE:           // 0x5F
+        case SCENE_DEATH_MOUNTAIN_TRAIL:    // 0x60
+        case SCENE_DEATH_MOUNTAIN_CRATER:   // 0x61
+        case SCENE_GORON_CITY:              // 0x62
+        case SCENE_LON_LON_RANCH:           // 0x63
+        case SCENE_OUTSIDE_GANONS_CASTLE:   // 0x64
+        case SCENE_MARKET_ENTRANCE_DAY:     // 0x1B
+        case SCENE_MARKET_ENTRANCE_NIGHT:   // 0x1C
+        case SCENE_MARKET_ENTRANCE_RUINS:   // 0x1D
+        case SCENE_BACK_ALLEY_DAY:          // 0x1E
+        case SCENE_BACK_ALLEY_NIGHT:        // 0x1F
+        case SCENE_MARKET_DAY:              // 0x20
+        case SCENE_MARKET_NIGHT:            // 0x21
+        case SCENE_MARKET_RUINS:            // 0x22
+        case SCENE_TEMPLE_OF_TIME_EXTERIOR_DAY:    // 0x23
+        case SCENE_TEMPLE_OF_TIME_EXTERIOR_NIGHT:  // 0x24
+        case SCENE_TEMPLE_OF_TIME_EXTERIOR_RUINS:  // 0x25
+        case SCENE_CASTLE_COURTYARD_GUARDS_DAY:    // 0x45
+        case SCENE_CASTLE_COURTYARD_GUARDS_NIGHT:  // 0x46
+        case SCENE_CASTLE_COURTYARD_ZELDA:         // 0x4A
+        case SCENE_HAIRAL_NIWA2:                   // 0x6B
+            config.enabled = true;
+            config.giIntensity = 0.3f;
+            config.maxBounces = 2;
+            config.skyColor[0] = 0.4f; config.skyColor[1] = 0.6f; config.skyColor[2] = 1.0f;
+            config.skyHorizonColor[0] = 0.7f; config.skyHorizonColor[1] = 0.75f; config.skyHorizonColor[2] = 0.8f;
+            config.sunDirection[0] = 0.5145f; config.sunDirection[1] = 0.8232f; config.sunDirection[2] = 0.3087f;
+            config.sunIntensity = 1.8f;
+            config.sunColor[0] = 1.0f; config.sunColor[1] = 1.0f; config.sunColor[2] = 1.0f;
+            config.ambientColor[0] = 0.25f; config.ambientColor[1] = 0.30f; config.ambientColor[2] = 0.50f;
+            config.ambientIntensity = 0.35f;
+            config.fogColorDefault[0] = 0.50f; config.fogColorDefault[1] = 0.55f; config.fogColorDefault[2] = 0.85f;
+            config.fogNearDefault = 8000.0f; config.fogFarDefault = 25000.0f; config.fogDensity = 0.4f;
+            config.probeDensity = 300.0f; config.probeRadius = 500.0f;
+            config.baseReflectivity = 0.04f; config.roughnessScale = 1.0f; config.emissiveScale = 0.4f;
+            config.reflectionQuality = 0.6f; config.waterReflectivity = 0.5f; config.waterRoughness = 0.15f;
+            config.aoRadius = 40.0f; config.aoIntensity = 0.35f;
+            config.ambientMinIntensity = 0.10f;
+            config.exposure = 1.0f; config.toneMapMode = 0;
+            break;
+
+        // ====================================================================
+        // INDOOR SCENES — small interiors, houses, shops
+        // Warm enclosed lighting, short fog range, strong AO
+        // ====================================================================
+        case SCENE_KNOW_IT_ALL_BROS_HOUSE:  // 0x26
+        case SCENE_TWINS_HOUSE:             // 0x27
+        case SCENE_MIDOS_HOUSE:             // 0x28
+        case SCENE_SARIAS_HOUSE:            // 0x29
+        case SCENE_KAKARIKO_CENTER_GUEST_HOUSE: // 0x2A
+        case SCENE_BACK_ALLEY_HOUSE:        // 0x2B
+        case SCENE_BAZAAR:                  // 0x2C
+        case SCENE_GORON_SHOP:              // 0x2E
+        case SCENE_ZORA_SHOP:              // 0x2F
+        case SCENE_POTION_SHOP_KAKARIKO:    // 0x30
+        case SCENE_POTION_SHOP_MARKET:      // 0x31
+        case SCENE_BOMBCHU_SHOP:            // 0x32
+        case SCENE_HAPPY_MASK_SHOP:         // 0x33
+        case SCENE_DOG_LADY_HOUSE:          // 0x35
+        case SCENE_STABLE:                  // 0x36
+        case SCENE_IMPAS_HOUSE:             // 0x37
+        case SCENE_LAKESIDE_LABORATORY:     // 0x38
+        case SCENE_CARPENTERS_TENT:         // 0x39
+        case SCENE_GRAVEKEEPERS_HUT:        // 0x3A
+        case SCENE_SHOOTING_GALLERY:        // 0x42
+        case SCENE_MARKET_GUARD_HOUSE:      // 0x4D
+        case SCENE_POTION_SHOP_GRANNY:      // 0x4E
+        case SCENE_HOUSE_OF_SKULLTULA:      // 0x50
+        case SCENE_TREASURE_BOX_SHOP:       // 0x10
+        case SCENE_LON_LON_BUILDINGS:       // 0x4C
+        case SCENE_BOMBCHU_BOWLING_ALLEY:   // 0x4B
+        case SCENE_FISHING_POND:            // 0x49
+        case SCENE_WINDMILL_AND_DAMPES_GRAVE: // 0x48
+            config.enabled = true;
+            config.giIntensity = 1.2f;
+            config.maxBounces = 3;
+            config.skyColor[0] = 0.3f; config.skyColor[1] = 0.25f; config.skyColor[2] = 0.2f;
+            config.skyHorizonColor[0] = 0.3f; config.skyHorizonColor[1] = 0.25f; config.skyHorizonColor[2] = 0.2f;
+            config.sunDirection[0] = 0.0f; config.sunDirection[1] = 1.0f; config.sunDirection[2] = 0.0f;
+            config.sunIntensity = 1.5f;
+            config.sunColor[0] = 1.0f; config.sunColor[1] = 0.95f; config.sunColor[2] = 0.85f;
+            config.ambientColor[0] = 0.20f; config.ambientColor[1] = 0.18f; config.ambientColor[2] = 0.15f;
+            config.ambientIntensity = 0.6f;
+            config.fogColorDefault[0] = 0.25f; config.fogColorDefault[1] = 0.22f; config.fogColorDefault[2] = 0.18f;
+            config.fogNearDefault = 800.0f; config.fogFarDefault = 3000.0f; config.fogDensity = 1.0f;
+            config.probeDensity = 80.0f; config.probeRadius = 120.0f;
+            config.baseReflectivity = 0.04f; config.roughnessScale = 0.9f; config.emissiveScale = 1.2f;
+            config.reflectionQuality = 0.7f; config.waterReflectivity = 0.3f; config.waterRoughness = 0.3f;
+            config.aoRadius = 25.0f; config.aoIntensity = 0.85f;
+            config.ambientMinIntensity = 0.12f;
+            config.exposure = 1.1f; config.toneMapMode = 0;
+            break;
+
+        // ====================================================================
+        // DUNGEONS — dark underground, tight geometry, strong AO
+        // ====================================================================
+        case SCENE_DODONGOS_CAVERN:         // 0x01
+        case SCENE_JABU_JABU:              // 0x02
+        case SCENE_FOREST_TEMPLE:           // 0x03
+        case SCENE_FIRE_TEMPLE:             // 0x04
+        case SCENE_WATER_TEMPLE:            // 0x05
+        case SCENE_SPIRIT_TEMPLE:           // 0x06
+        case SCENE_SHADOW_TEMPLE:           // 0x07
+        case SCENE_BOTTOM_OF_THE_WELL:      // 0x08
+        case SCENE_ICE_CAVERN:              // 0x09
+        case SCENE_GANONS_TOWER:            // 0x0A
+        case SCENE_GERUDO_TRAINING_GROUND:  // 0x0B
+        case SCENE_THIEVES_HIDEOUT:         // 0x0C
+        case SCENE_INSIDE_GANONS_CASTLE:    // 0x0D
+        case SCENE_INSIDE_GANONS_CASTLE_COLLAPSE: // 0x0F
+        case SCENE_GROTTOS:                 // 0x3E
+        case SCENE_REDEAD_GRAVE:            // 0x3F
+        case SCENE_GRAVE_WITH_FAIRYS_FOUNTAIN: // 0x40
+        case SCENE_ROYAL_FAMILYS_TOMB:      // 0x41
+            config.enabled = true;
+            config.giIntensity = 0.8f;
+            config.maxBounces = 2;
+            config.skyColor[0] = 0.05f; config.skyColor[1] = 0.05f; config.skyColor[2] = 0.08f;
+            config.skyHorizonColor[0] = 0.05f; config.skyHorizonColor[1] = 0.05f; config.skyHorizonColor[2] = 0.08f;
+            config.sunDirection[0] = 0.0f; config.sunDirection[1] = 1.0f; config.sunDirection[2] = 0.0f;
+            config.sunIntensity = 1.2f;
+            config.sunColor[0] = 0.9f; config.sunColor[1] = 0.85f; config.sunColor[2] = 0.7f;
+            config.ambientColor[0] = 0.12f; config.ambientColor[1] = 0.10f; config.ambientColor[2] = 0.15f;
+            config.ambientIntensity = 0.5f;
+            config.fogColorDefault[0] = 0.05f; config.fogColorDefault[1] = 0.05f; config.fogColorDefault[2] = 0.08f;
+            config.fogNearDefault = 500.0f; config.fogFarDefault = 3000.0f; config.fogDensity = 1.2f;
+            config.probeDensity = 100.0f; config.probeRadius = 150.0f;
+            config.baseReflectivity = 0.04f; config.roughnessScale = 1.2f; config.emissiveScale = 0.8f;
+            config.reflectionQuality = 0.6f; config.waterReflectivity = 0.6f; config.waterRoughness = 0.08f;
+            config.aoRadius = 50.0f; config.aoIntensity = 1.0f;
+            config.ambientMinIntensity = 0.06f;
+            config.exposure = 1.2f; config.toneMapMode = 0;
+            break;
+
+        // ====================================================================
+        // BOSS ROOMS
+        // ====================================================================
+        case SCENE_DEKU_TREE_BOSS:          // 0x11
+        case SCENE_DODONGOS_CAVERN_BOSS:    // 0x12
+        case SCENE_JABU_JABU_BOSS:          // 0x13
+        case SCENE_FOREST_TEMPLE_BOSS:      // 0x14
+        case SCENE_FIRE_TEMPLE_BOSS:        // 0x15
+        case SCENE_WATER_TEMPLE_BOSS:       // 0x16
+        case SCENE_SPIRIT_TEMPLE_BOSS:      // 0x17
+        case SCENE_SHADOW_TEMPLE_BOSS:      // 0x18
+        case SCENE_GANONDORF_BOSS:          // 0x19
+        case SCENE_GANON_BOSS:              // 0x4F
+            config.enabled = true;
+            config.giIntensity = 0.6f;
+            config.maxBounces = 2;
+            config.skyColor[0] = 0.05f; config.skyColor[1] = 0.02f; config.skyColor[2] = 0.02f;
+            config.skyHorizonColor[0] = 0.08f; config.skyHorizonColor[1] = 0.03f; config.skyHorizonColor[2] = 0.03f;
+            config.sunDirection[0] = 0.0f; config.sunDirection[1] = 1.0f; config.sunDirection[2] = 0.0f;
+            config.sunIntensity = 1.5f;
+            config.sunColor[0] = 1.0f; config.sunColor[1] = 0.7f; config.sunColor[2] = 0.5f;
+            config.ambientColor[0] = 0.15f; config.ambientColor[1] = 0.08f; config.ambientColor[2] = 0.08f;
+            config.ambientIntensity = 0.4f;
+            config.fogColorDefault[0] = 0.06f; config.fogColorDefault[1] = 0.02f; config.fogColorDefault[2] = 0.02f;
+            config.fogNearDefault = 400.0f; config.fogFarDefault = 2500.0f; config.fogDensity = 1.3f;
+            config.probeDensity = 120.0f; config.probeRadius = 180.0f;
+            config.baseReflectivity = 0.05f; config.roughnessScale = 1.0f; config.emissiveScale = 1.0f;
+            config.reflectionQuality = 0.7f; config.waterReflectivity = 0.4f; config.waterRoughness = 0.2f;
+            config.aoRadius = 45.0f; config.aoIntensity = 0.9f;
+            config.ambientMinIntensity = 0.05f;
+            config.exposure = 1.3f; config.toneMapMode = 0;
+            break;
+
+        // ====================================================================
+        // SPECIAL / FAIRY FOUNTAINS / SACRED SPACES
+        // ====================================================================
+        case SCENE_GREAT_FAIRYS_FOUNTAIN_MAGIC:   // 0x3B
+        case SCENE_FAIRYS_FOUNTAIN:               // 0x3C
+        case SCENE_GREAT_FAIRYS_FOUNTAIN_SPELLS:  // 0x3D
+        case SCENE_CHAMBER_OF_THE_SAGES:          // 0x44
+        case SCENE_CUTSCENE_MAP:                  // 0x47
+        case SCENE_GANONS_TOWER_COLLAPSE_INTERIOR:   // 0x0E
+        case SCENE_GANONS_TOWER_COLLAPSE_EXTERIOR:   // 0x1A
+            config.enabled = true;
+            config.giIntensity = 1.0f;
+            config.maxBounces = 3;
+            config.skyColor[0] = 0.2f; config.skyColor[1] = 0.3f; config.skyColor[2] = 0.5f;
+            config.skyHorizonColor[0] = 0.3f; config.skyHorizonColor[1] = 0.4f; config.skyHorizonColor[2] = 0.6f;
+            config.sunDirection[0] = 0.0f; config.sunDirection[1] = 1.0f; config.sunDirection[2] = 0.0f;
+            config.sunIntensity = 1.2f;
+            config.sunColor[0] = 0.8f; config.sunColor[1] = 0.9f; config.sunColor[2] = 1.0f;
+            config.ambientColor[0] = 0.2f; config.ambientColor[1] = 0.25f; config.ambientColor[2] = 0.4f;
+            config.ambientIntensity = 0.7f;
+            config.fogColorDefault[0] = 0.15f; config.fogColorDefault[1] = 0.2f; config.fogColorDefault[2] = 0.35f;
+            config.fogNearDefault = 600.0f; config.fogFarDefault = 2500.0f; config.fogDensity = 0.8f;
+            config.probeDensity = 100.0f; config.probeRadius = 150.0f;
+            config.baseReflectivity = 0.06f; config.roughnessScale = 0.7f; config.emissiveScale = 1.5f;
+            config.reflectionQuality = 1.0f; config.waterReflectivity = 0.8f; config.waterRoughness = 0.03f;
+            config.aoRadius = 35.0f; config.aoIntensity = 0.6f;
+            config.ambientMinIntensity = 0.15f;
+            config.exposure = 1.0f; config.toneMapMode = 0;
+            break;
+
+        // ====================================================================
+        // EVERYTHING ELSE — enable with safe neutral defaults
+        // ====================================================================
         default:
-            // RTX not enabled for this scene
+            config.enabled = true;
             break;
     }
 
@@ -1101,7 +1313,7 @@ SceneConfig LoadSceneConfigFromFile(uint16_t sceneId, const std::string& configP
 
     FILE* f = fopen(path.c_str(), "r");
     if (!f) {
-        // File doesn't exist; return default config (with enabled=false for non-RTX scenes)
+        // File doesn't exist; return default config.
         return config;
     }
 
