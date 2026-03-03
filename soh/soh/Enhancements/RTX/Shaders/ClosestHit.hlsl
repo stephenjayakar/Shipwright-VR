@@ -164,7 +164,7 @@ void ClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttribut
     }
 
     bool pathStyleMaterial = ((mat.isDecal != 0) || (mat.combinerMode == COMBINER_DECAL));
-    bool pathLikeForClamp = pathStyleMaterial;
+    bool isPathLikeMaterial = false;
 
     if (!isWaterSurface) {
         float3 prePath = saturate(albedo);
@@ -172,31 +172,34 @@ void ClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttribut
         float minCh = min(prePath.r, min(prePath.g, prePath.b));
         float sat = maxCh - minCh;
         float greenBias = prePath.g - max(prePath.r, prePath.b);
-        bool looksVegetation = (greenBias > 0.04) || (prePath.g > prePath.r * 1.10 && prePath.g > prePath.b * 1.06);
+        bool looksVegetation = (greenBias > 0.04) ||
+            (prePath.g > prePath.r * 1.10 && prePath.g > prePath.b * 1.06);
         bool lowSatTerrain = (sat < 0.22);
-        bool isPathLike = pathStyleMaterial && lowSatTerrain && !looksVegetation;
-        pathLikeForClamp = isPathLike;
+        isPathLikeMaterial = pathStyleMaterial && lowSatTerrain && !looksVegetation;
 
         if (hasRealTexture) {
             // Keep alpha-tested masks texture-driven; avoid vertex-color whitening.
             float coverage = saturate(texColor.a);
             if (mat.isAlphaTested != 0) {
-                albedo *= lerp(0.68, 1.0, coverage);
+                if (pathStyleMaterial) {
+                    // Path/overlay masks should preserve underlying grass tones.
+                    float3 preserveGrass = lerp(vtxColor.rgb, texColor.rgb * vtxColor.rgb, coverage);
+                    albedo = lerp(albedo, preserveGrass, isPathLikeMaterial ? 0.78 : 0.35);
+                }
+
+                float alphaShadeFloor = isPathLikeMaterial ? 0.90 : (pathStyleMaterial ? 0.80 : 0.68);
+                albedo *= lerp(alphaShadeFloor, 1.0, coverage);
             }
         }
 
-        // Targeted dirt-path remap only for decal-like materials.
-        if (isPathLike) {
+        if (isPathLikeMaterial) {
             float mask = hasRealTexture
                 ? saturate(dot(texColor.rgb, float3(0.299, 0.587, 0.114)))
                 : 0.55;
             float3 dirtDark = float3(0.24, 0.19, 0.13);
             float3 dirtLight = float3(0.56, 0.47, 0.34);
             float3 dirtTone = lerp(dirtDark, dirtLight, mask);
-            // Stronger blend for alpha-tested path overlays so the bright/chalk strip
-            // reads as a grounded dirt path close to the native look.
-            float blend = (mat.isAlphaTested != 0) ? 0.52 : 0.24;
-            albedo = lerp(albedo, dirtTone, blend);
+            albedo = lerp(albedo, dirtTone, 0.18);
         }
 
         // Mild fallback for truly untextured surfaces.
@@ -212,7 +215,7 @@ void ClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttribut
     albedo = saturate(albedo);
     float albedoLuma = dot(albedo, float3(0.299, 0.587, 0.114));
     if (!isWaterSurface) {
-        float maxLuma = pathLikeForClamp ? 0.62 : 0.82;
+        float maxLuma = isPathLikeMaterial ? 0.76 : 0.82;
         if (albedoLuma > maxLuma) {
             albedo *= (maxLuma / max(albedoLuma, 0.001));
         }
@@ -361,7 +364,7 @@ void ClosestHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttribut
         float3 energyCap = albedo * 1.35 + float3(0.12, 0.12, 0.12);
         finalColor = min(finalColor, energyCap);
         // Decal/path materials: strict white guard only where needed.
-        if (pathLikeForClamp) {
+        if (isPathLikeMaterial) {
             float luma = dot(finalColor, float3(0.299, 0.587, 0.114));
             if (luma > 0.72) {
                 finalColor *= (0.72 / max(luma, 0.001));
