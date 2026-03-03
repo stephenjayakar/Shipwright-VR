@@ -224,7 +224,7 @@ public:
 
     // Maximum frames to accumulate before capping.
     // Higher values = cleaner image but slower convergence when moving.
-    static constexpr uint32_t DEFAULT_MAX_ACCUMULATION_FRAMES = 128;
+    static constexpr uint32_t DEFAULT_MAX_ACCUMULATION_FRAMES = 24;
 
     // Denoise parameters — tuned for v8 A-trous wavelet filter with:
     //   - Separate luminance/chrominance filtering via YCoCg (shader applies 2.5x relaxation on chroma)
@@ -234,10 +234,10 @@ public:
     //   - Robust firefly suppression using mean+k*sigma clamping (extended to pass 2)
     //   - SIGMA_L_REF=2.0 in shader for stronger baseline noise reduction
     // These base values are passed to the shader per-pass with per-pass scaling (see GetDenoiseConstants).
-    static constexpr float DEFAULT_COLOR_SIGMA = 0.15f;    // Luminance edge-stopping base (shader applies variance-adaptive scaling via SIGMA_L_REF=2.0)
+    static constexpr float DEFAULT_COLOR_SIGMA = 0.03f;    // Tighter denoise to avoid smeared terrain detail.
     static constexpr float DEFAULT_NORMAL_SIGMA = 128.0f;  // Normal edge-stopping: power-cosine exponent (higher = sharper edges, 128 for N64 hard polygon breaks)
     static constexpr float DEFAULT_DEPTH_SIGMA = 0.030f;   // Depth edge-stopping: lower = tighter (gradient-aware in shader, hard cutoff at 5%)
-    static constexpr int NUM_DENOISE_PASSES = 4;           // 4 A-trous passes (step 1,2,4,8) — reduced from 5 to prevent excessive blur
+    static constexpr int NUM_DENOISE_PASSES = 1;           // Single pass to avoid smear while keeping basic cleanup.
 
     // Temporal accumulation parameters — v8 Accumulate.hlsl uses:
     //   - YCoCg-space variance clipping (mean±1.25σ) for tight history rejection
@@ -247,7 +247,7 @@ public:
     //   - Variance-adaptive: noisy areas get 30% alpha (strong history retention)
     //   - Lower convergence floor (0.03) for smoother steady-state
     // This base alpha is the starting point; shader adapts per-pixel.
-    static constexpr float DEFAULT_BLEND_ALPHA = 0.15f;    // EMA blend factor: 15% current frame weight. Higher than 0.08 to reduce ghosting. Shader clamps minimum to 0.10 and boosts in noisy/moving areas.
+    static constexpr float DEFAULT_BLEND_ALPHA = 0.45f;    // Strong current-frame weight for less ghosting/flashing.
 
     // Probe defaults
     static constexpr float DEFAULT_PROBE_DENSITY = 200.0f;    // World units between probes

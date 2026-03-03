@@ -5424,7 +5424,37 @@ uint32_t TextureManager::EagerResolveOTRTexture(const char* otrPath,
                     rgba8[0], rgba8[1], rgba8[2], rgba8[3]);
     }
 
-    // Upload decoded RGBA8 data to GPU via TextureManager
+    // Upload decoded RGBA8 data to GPU via TextureManager.
+    // Some Kokiri path overlay masks (alpha-tested TEX_ENV_BLEND set) decode as near-white,
+    // which creates a chalk strip when blended in RTX. Re-tint only those overlay masks.
+    const bool isKokiriPathOverlayMask =
+        (strstr(otrPath, "spot04_room_0Tex_01A290") != nullptr) ||
+        (strstr(otrPath, "spot04_room_0Tex_019A90") != nullptr) ||
+        (strstr(otrPath, "spot04_room_0Tex_019290") != nullptr) ||
+        (strstr(otrPath, "spot04_sceneTex_00F218") != nullptr);
+    if (isKokiriPathOverlayMask) {
+        for (size_t i = 0; i + 3 < rgba8.size(); i += 4) {
+            const float luma = (0.299f * rgba8[i + 0] + 0.587f * rgba8[i + 1] + 0.114f * rgba8[i + 2]) / 255.0f;
+            const float coverage = rgba8[i + 3] / 255.0f;
+            const float t = std::clamp(luma, 0.0f, 1.0f);
+            const float darkR = 0.17f;
+            const float darkG = 0.12f;
+            const float darkB = 0.07f;
+            const float lightR = 0.42f;
+            const float lightG = 0.33f;
+            const float lightB = 0.22f;
+            const float strength = std::clamp(0.25f + (coverage * 0.55f), 0.0f, 1.0f);
+
+            const float targetR = (darkR * (1.0f - t)) + (lightR * t);
+            const float targetG = (darkG * (1.0f - t)) + (lightG * t);
+            const float targetB = (darkB * (1.0f - t)) + (lightB * t);
+
+            rgba8[i + 0] = static_cast<uint8_t>((((rgba8[i + 0] / 255.0f) * (1.0f - strength)) + (targetR * strength)) * 255.0f);
+            rgba8[i + 1] = static_cast<uint8_t>((((rgba8[i + 1] / 255.0f) * (1.0f - strength)) + (targetG * strength)) * 255.0f);
+            rgba8[i + 2] = static_cast<uint8_t>((((rgba8[i + 2] / 255.0f) * (1.0f - strength)) + (targetB * strength)) * 255.0f);
+        }
+    }
+
     // Upscale texture for sharper bilinear at high resolution
     uint32_t uploadW = otrWidth;
     uint32_t uploadH = otrHeight;

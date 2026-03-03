@@ -883,15 +883,29 @@ void SceneGeometryExtractor::WalkDisplayListInner(const Gfx* dl, bool isTransluc
             break;
         }
 
+        case G_SETENVCOLOR:
+            m_materialState.envColorR = (uint8_t)((cmd->words.w1 >> 24) & 0xFF);
+            m_materialState.envColorG = (uint8_t)((cmd->words.w1 >> 16) & 0xFF);
+            m_materialState.envColorB = (uint8_t)((cmd->words.w1 >> 8) & 0xFF);
+            m_materialState.envColorA = (uint8_t)(cmd->words.w1 & 0xFF);
+            m_materialState.hasEnvColor = true;
+            break;
+
+        case G_SETPRIMCOLOR:
+            m_materialState.primColorR = (uint8_t)((cmd->words.w1 >> 24) & 0xFF);
+            m_materialState.primColorG = (uint8_t)((cmd->words.w1 >> 16) & 0xFF);
+            m_materialState.primColorB = (uint8_t)((cmd->words.w1 >> 8) & 0xFF);
+            m_materialState.primColorA = (uint8_t)(cmd->words.w1 & 0xFF);
+            m_materialState.hasPrimColor = true;
+            break;
+
         // ---- Commands we recognize but don't need to act on ----
         case G_RDPPIPESYNC:
         case G_LOADBLOCK:
-        case G_SETENVCOLOR:
         case G_NOOP:
         case G_RDPFULLSYNC:
         case G_RDPTILESYNC:
         case G_RDPLOADSYNC:
-        case G_SETPRIMCOLOR:
         case G_SETFOGCOLOR:
         case G_SETBLENDCOLOR:
         case G_SETFILLCOLOR:
@@ -1846,6 +1860,16 @@ uint32_t SceneGeometryExtractor::GetOrCreateMaterial(ExtractedMesh& mesh) {
     }
     bool isAlphaMesh = (&mesh == m_alphaMesh);
     auto& matMap = isAlphaMesh ? m_alphaMaterialMap : m_opaqueMaterialMap;
+    auto lumaFromRgb = [](uint8_t r, uint8_t g, uint8_t b) -> uint8_t {
+        const uint32_t l = (77u * (uint32_t)r + 150u * (uint32_t)g + 29u * (uint32_t)b) >> 8;
+        return (uint8_t)l;
+    };
+    const uint8_t primLuma = m_materialState.hasPrimColor
+        ? lumaFromRgb(m_materialState.primColorR, m_materialState.primColorG, m_materialState.primColorB)
+        : 0;
+    const uint8_t envLuma = m_materialState.hasEnvColor
+        ? lumaFromRgb(m_materialState.envColorR, m_materialState.envColorG, m_materialState.envColorB)
+        : 0;
 
     CombinerMode combMode = ClassifyCombiner(m_materialState.combinerMode);
     bool alphaTest = m_materialState.alphaTest || DetectAlphaTest(m_materialState.otherModeL);
@@ -1857,7 +1881,10 @@ uint32_t SceneGeometryExtractor::GetOrCreateMaterial(ExtractedMesh& mesh) {
     //    This catches water surfaces whose segment 0x0C textures were converted to OTR
     //    hashes that don't contain water keywords.
     bool isWater = DetectWaterTexture(m_materialState.textureAddr);
-    if (!isWater && isAlphaMesh) {
+    // Avoid classifying non-water alpha geometry (grass decals, foliage masks) as water.
+    // Restrict render-mode water fallback to intensity/alpha texture formats only.
+    const bool waterLikeTexFormat = (m_materialState.texFormat == 3u) || (m_materialState.texFormat == 4u);
+    if (!isWater && isAlphaMesh && waterLikeTexFormat) {
         isWater = DetectWaterRenderMode(m_materialState.otherModeL, true);
         if (isWater) {
             static uint32_t s_waterRMDetectCount = 0;
@@ -1889,6 +1916,34 @@ uint32_t SceneGeometryExtractor::GetOrCreateMaterial(ExtractedMesh& mesh) {
     // other surfaces at the same Z depth (e.g., dirt paths on grass).
     // Decals that are NOT water need special handling in ray tracing (Z bias offset).
     bool isDecal = DetectDecalMode(m_materialState.otherModeL);
+    // Kokiri path override: some path overlays are authored as bright IA masks and
+    // may not always carry ZMODE_DEC in translated render state. Force decal behavior
+    // for known path texture IDs so shader tint/alpha logic can run.
+    bool forcePathDecal = false;
+#ifdef _WIN32
+    if (m_materialState.textureAddr > 0x10000) {
+        char pathBuf[512];
+        if (TryCopyStringFromAddr(m_materialState.textureAddr, pathBuf, sizeof(pathBuf))) {
+            if (strstr(pathBuf, "spot04_room_0Tex_01A290") != nullptr ||
+                strstr(pathBuf, "spot04_room_0Tex_01A2") != nullptr ||
+                strstr(pathBuf, "spot04_room_0Tex_019A90") != nullptr ||
+                strstr(pathBuf, "spot04_room_0Tex_019290") != nullptr ||
+                strstr(pathBuf, "spot04_sceneTex_00F218") != nullptr ||
+                strstr(pathBuf, "spot04_sceneTex_00FE18") != nullptr) {
+                forcePathDecal = true;
+            }
+        }
+    }
+#endif
+    if (forcePathDecal) {
+        isDecal = true;
+        alphaTest = true;
+    }
+    // Non-water decals in the translucent mesh are effectively mask overlays
+    // in OoT content. Force alpha-test so AnyHit can clip the rectangular quad.
+    if (isDecal && isAlphaMesh && !isWater) {
+        alphaTest = true;
+    }
     if (isDecal && !isWater) {
         static uint32_t s_decalDetectCount = 0;
         s_decalDetectCount++;
@@ -1911,6 +1966,8 @@ uint32_t SceneGeometryExtractor::GetOrCreateMaterial(ExtractedMesh& mesh) {
     key.isDecal = isDecal;
     key.wrapModeS = m_materialState.wrapModeS;
     key.wrapModeT = m_materialState.wrapModeT;
+    key.primLuma = primLuma;
+    key.envLuma = envLuma;
 
     auto it = matMap.find(key);
     if (it != matMap.end()) {
@@ -1919,15 +1976,23 @@ uint32_t SceneGeometryExtractor::GetOrCreateMaterial(ExtractedMesh& mesh) {
 
     // Create a new material.
     Material mat;
-    mat.textureIndex = 1; // Default checkerboard fallback — visually distinct from resolved textures.
-                         // White (index 0) caused Deku Tree to appear solid white when textures
-                         // weren't resolved. Checkerboard (magenta/black at index 1) makes
-                         // unresolved textures obvious. Will be resolved below or in deferred re-resolve.
+    mat.textureIndex = 0; // Default unresolved state (white fallback).
+                         // IMPORTANT: ResolveMaterialTextures / deferred re-resolve treat <=2
+                         // as fallback/reserved and >2 as real resolved textures.
     mat.combinerMode = static_cast<uint32_t>(combMode);
     mat.isAlphaTested = alphaTest ? 1 : 0;
     mat.isWater = isWater ? 1 : 0;
     mat.isDecal = isDecal ? 1 : 0;
-    mat._materialPad = 0;
+    // Preserve original N64 texture format/size for shader-side material heuristics.
+    // Packing:
+    //   bits  0.. 7: texSize
+    //   bits  8..15: texFormat
+    //   bits 16..23: prim color luminance (0 if unset)
+    //   bits 24..31: env  color luminance (0 if unset)
+    mat._materialPad = (static_cast<uint32_t>(envLuma) << 24) |
+                       (static_cast<uint32_t>(primLuma) << 16) |
+                       (static_cast<uint32_t>(m_materialState.texFormat) << 8) |
+                       static_cast<uint32_t>(m_materialState.texSize);
     mat.wrapModeS = m_materialState.wrapModeS;
     mat.wrapModeT = m_materialState.wrapModeT;
     mat.texWidthPx = m_materialState.texWidth;
@@ -1936,7 +2001,7 @@ uint32_t SceneGeometryExtractor::GetOrCreateMaterial(ExtractedMesh& mesh) {
     // Eagerly attempt to resolve the texture right now by checking the TextureManager
     // cache. This catches textures that were already uploaded via RTX_InterceptTexture
     // before this geometry extraction runs. Textures not yet loaded will remain at
-    // textureIndex=1 (checkerboard fallback) and be resolved by deferred re-resolve in DispatchAndPresent.
+    // textureIndex=0 (white fallback) and be resolved by deferred re-resolve in DispatchAndPresent.
     if (m_materialState.textureAddr > 0x10000) {
         auto& texMgr = RTX::TextureManager::GetInstance();
         if (texMgr.GetSRVHeap()) {
@@ -2086,12 +2151,12 @@ uint32_t SceneGeometryExtractor::GetOrCreateMaterial(ExtractedMesh& mesh) {
         static uint32_t s_matCreateLog = 0;
         static uint32_t s_matEagerResolved = 0;
         s_matCreateLog++;
-        if (mat.textureIndex > 0) s_matEagerResolved++;
+        if (mat.textureIndex > 2) s_matEagerResolved++;
         if (s_matCreateLog <= 40 || (s_matCreateLog % 100) == 0) {
             if (isStr) {
                 RTX_DIAG("CreateMaterial #%u: matID=%u texIdx=%u%s path='%s' comb=%u alpha=%u water=%u %s texW=%u texH=%u (eager=%u/%u)",
                          s_matCreateLog, matID, mat.textureIndex,
-                         mat.textureIndex > 0 ? " [RESOLVED]" : " [UNRESOLVED]",
+                         mat.textureIndex > 2 ? " [RESOLVED]" : " [UNRESOLVED]",
                          mesh.materialTexturePaths.back().c_str(),
                          mat.combinerMode, mat.isAlphaTested, mat.isWater,
                          isAlphaMesh ? "ALPHA" : "OPAQUE",
@@ -2100,7 +2165,7 @@ uint32_t SceneGeometryExtractor::GetOrCreateMaterial(ExtractedMesh& mesh) {
             } else {
                 RTX_DIAG("CreateMaterial #%u: matID=%u texIdx=%u%s texAddr=0x%llX (not string) comb=%u alpha=%u water=%u %s texW=%u texH=%u (eager=%u/%u)",
                          s_matCreateLog, matID, mat.textureIndex,
-                         mat.textureIndex > 0 ? " [RESOLVED]" : " [UNRESOLVED]",
+                         mat.textureIndex > 2 ? " [RESOLVED]" : " [UNRESOLVED]",
                          (unsigned long long)m_materialState.textureAddr,
                          mat.combinerMode, mat.isAlphaTested, mat.isWater,
                          isAlphaMesh ? "ALPHA" : "OPAQUE",
@@ -2513,6 +2578,13 @@ bool SceneGeometryExtractor::DetectWaterTexture(uintptr_t textureAddr) {
         }
         return false;
     };
+
+    // Kokiri exclusions: these are grass/ground overlays that were being
+    // misclassified as water by translucent render-mode fallback.
+    if (containsCI(path, "spot04_room_0Tex_018A90") ||
+        containsCI(path, "spot04_room_0Tex_01B090")) {
+        return false;
+    }
 
     // Strategy 1: Generic water keywords in OTR texture path.
     // These match water textures across all OoT scenes.

@@ -193,8 +193,8 @@ static void InitDefaultMaterialOverrides() {
 SceneConfig GetDefaultConfig() {
     SceneConfig config = {};
     config.enabled = true;
-    config.giIntensity = 0.3f;
-    config.maxBounces = 2;
+    config.giIntensity = 0.18f;
+    config.maxBounces = 4;
 
     // Sky: neutral blue sky default with light gray-blue horizon
     config.skyColor[0] = 0.4f;
@@ -262,8 +262,8 @@ SceneConfig GetDefaultConfig() {
     // Denoiser: ENABLED — temporal accumulation reduces stochastic noise from ray tracing.
     // Without this, 1-sample-per-pixel shadow and GI rays produce heavy grain.
     config.denoiserEnabled = true;      // Master denoiser switch: ON
-    config.temporalWeight = 0.15f;      // Temporal accumulation alpha (0.15 = keep 85% history, add 15% new). Matches DEFAULT_BLEND_ALPHA.
-    config.blurRadius = 2;              // Moderate spatial blur for remaining noise
+    config.temporalWeight = 0.30f;      // Faster convergence to reduce smearing/ghosting in motion.
+    config.blurRadius = 1;              // Lighter spatial blur to keep texture detail.
 
     return config;
 }
@@ -287,8 +287,8 @@ SceneConfig GetSceneConfig(uint16_t sceneId) {
             //   - Lower sun intensity to avoid over-saturation through ACES
             // ================================================================
             config.enabled = true;
-            config.giIntensity = 0.3f;
-            config.maxBounces = 2;
+            config.giIntensity = 0.14f;
+            config.maxBounces = 4;
 
             // Sky: clear blue zenith, lighter gray-blue horizon
             config.skyColor[0] = 0.4f;
@@ -305,7 +305,7 @@ SceneConfig GetSceneConfig(uint16_t sceneId) {
             // Reduced intensity: 1.6 instead of 2.0.
             // N64 textures have very saturated yellow/green. High intensity
             // pushes these through ACES tone mapping curve which shifts hue.
-            config.sunIntensity = 1.6f;
+            config.sunIntensity = 1.2f;
             // PURE WHITE sun — absolutely critical.
             // Any warm tint (e.g., 1.0,0.95,0.85) amplifies the green N64 textures.
             config.sunColor[0] = 1.0f;
@@ -318,7 +318,7 @@ SceneConfig GetSceneConfig(uint16_t sceneId) {
             config.ambientColor[0] = 0.20f;
             config.ambientColor[1] = 0.25f;
             config.ambientColor[2] = 0.50f;
-            config.ambientIntensity = 0.40f;
+            config.ambientIntensity = 0.32f;
 
             // Fog: DISTINCTLY BLUE — the game's fog is (200,200,150)/255 = (0.784,0.784,0.588)
             // which is very yellow. Override with blue fog to push scene toward blue.
@@ -340,8 +340,8 @@ SceneConfig GetSceneConfig(uint16_t sceneId) {
 
             // Forest water streams
             config.reflectionQuality = 0.8f;
-            config.waterReflectivity = 0.5f;
-            config.waterRoughness = 0.12f;
+            config.waterReflectivity = 0.75f;
+            config.waterRoughness = 0.08f;
 
             // Moderate AO — adds depth and contact shadows to the forest
             config.aoRadius = 50.0f;
@@ -350,7 +350,7 @@ SceneConfig GetSceneConfig(uint16_t sceneId) {
             // Ambient minimum: low floor to preserve shadow contrast.
             config.ambientMinIntensity = 0.10f;
 
-            config.exposure = 1.0f;
+            config.exposure = 0.82f;
             config.toneMapMode = 0;  // 0=ACES filmic tone mapping
             break;
 

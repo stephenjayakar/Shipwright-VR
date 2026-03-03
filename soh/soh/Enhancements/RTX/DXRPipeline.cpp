@@ -851,9 +851,10 @@ bool DXRPipeline::CreateRaytracingPipeline() {
     // BuiltInTriangleIntersectionAttributes: float2 barycentrics = 8 bytes
     shaderConfig.MaxAttributeSizeInBytes = 8;
 
-    // Pipeline config: max recursion depth = 2 (primary + 1 GI bounce)
+    // Pipeline config: support primary + up to 4 indirect GI bounces.
     D3D12_RAYTRACING_PIPELINE_CONFIG pipelineConfig = {};
-    pipelineConfig.MaxTraceRecursionDepth = 2;
+    // Depth budget: primary ray + 4 bounce rays.
+    pipelineConfig.MaxTraceRecursionDepth = 5;
 
     // Global root signature subobject
     D3D12_GLOBAL_ROOT_SIGNATURE globalRootSig = {};

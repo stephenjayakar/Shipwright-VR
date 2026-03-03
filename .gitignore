@@ -4,6 +4,16 @@ __pycache__/
 .DS_Store
 .cache/*
 
+# Runtime captures and ad-hoc diagnostics
+/screenshots/
+/commit_summary.md
+/rtx_capture_proof.txt
+/rtx_cb_dump.txt
+/rtx_cycle11_diag.txt
+/test_stdout.txt
+/test_stderr.txt
+/.git.backup-kimaki-*/
+
 # Text editor remnants
 .vscode/*
 !.vscode/tasks.json

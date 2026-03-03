@@ -404,6 +404,25 @@ bool RTXRenderer::CompleteInitializationFromBridge() {
     if (m_uiCompositor) {
         m_uiCompositor->Initialize(m_device.get(), w, h);
     }
+
+    // Initialize screenshot capture in bridge path as well.
+    {
+        auto* d3dDevice = m_device->GetDevice();
+        auto* cmdQueue = m_device->GetCommandQueue();
+        auto* swapChain = m_device->GetSwapChain();
+        if (d3dDevice && cmdQueue) {
+            if (swapChain) {
+                RTXScreenCapture::Initialize(d3dDevice, cmdQueue, swapChain);
+            } else {
+                RTXScreenCapture::Initialize(d3dDevice, cmdQueue);
+            }
+            RTXScreenCapture::SetAutoCapture(60);
+#ifdef _WIN32
+            CreateDirectoryA("screenshots", nullptr);
+#endif
+            RTXScreenCapture::SetOutputDir("screenshots/");
+        }
+    }
     
     RTX_DIAG("RTXRenderer::CompleteInitializationFromBridge() SUCCESS");
     printf("[RTX] RTXRenderer::CompleteInitializationFromBridge() SUCCESS (%ux%u)\n", w, h);
@@ -1028,13 +1047,16 @@ void RTXRenderer::UpdateSceneParams(
     m_sceneConstants.exposure = m_currentSceneConfig.exposure;
 
     // --- Frame count, tone map, sky blend, debug mode (offset 352-364) ---
-    m_sceneConstants.frameCount = accumulationFrameCount;
+    // Use gameplay frame counter for shader-time animation (water/GI jitter seeds).
+    // Accumulation uses its own constants in Accumulate.hlsl and should not clamp shader time.
+    m_sceneConstants.frameCount = gameplayFrames;
     m_sceneConstants.toneMapMode = m_currentSceneConfig.toneMapMode;
     m_sceneConstants.skyBlendFactor = 0.5f;
     m_sceneConstants.debugMode = m_debugMode;
 
-    // --- Padding (offset 368-380) ---
-    m_sceneConstants.pad0 = 0.0f;
+    // --- GI recursion + padding (offset 368-380) ---
+    // maxBounces in scene config includes the first indirect bounce; clamp to a safe DXR budget.
+    m_sceneConstants.giMaxBounces = static_cast<uint32_t>(std::clamp(m_currentSceneConfig.maxBounces, 1, 4));
     m_sceneConstants.pad1 = 0.0f;
     m_sceneConstants.pad2 = 0.0f;
     m_sceneConstants.pad3 = 0.0f;
@@ -1044,13 +1066,14 @@ void RTXRenderer::UpdateSceneParams(
         static uint32_t s_sunLogCount = 0;
         s_sunLogCount++;
         if (s_sunLogCount <= 5 || (s_sunLogCount % 300) == 0) {
-            RTX_DIAG("SceneConstants FINAL sunDir=(%.3f,%.3f,%.3f) sunColor=(%.3f,%.3f,%.3f) sunInt=%.2f ambient=(%.3f,%.3f,%.3f) ambInt=%.2f gi=%.2f exp=%.2f debug=%d sizeof=%zu",
+            RTX_DIAG("SceneConstants FINAL sunDir=(%.3f,%.3f,%.3f) sunColor=(%.3f,%.3f,%.3f) sunInt=%.2f ambient=(%.3f,%.3f,%.3f) ambInt=%.2f gi=%.2f bounces=%u exp=%.2f debug=%d sizeof=%zu",
                      m_sceneConstants.sunDirection[0], m_sceneConstants.sunDirection[1], m_sceneConstants.sunDirection[2],
                      m_sceneConstants.sunColor[0], m_sceneConstants.sunColor[1], m_sceneConstants.sunColor[2],
                      m_sceneConstants.sunIntensity,
                      m_sceneConstants.ambientColor[0], m_sceneConstants.ambientColor[1], m_sceneConstants.ambientColor[2],
                      m_sceneConstants.ambientIntensity,
-                     m_sceneConstants.giIntensity, m_sceneConstants.exposure, m_sceneConstants.debugMode,
+                     m_sceneConstants.giIntensity, m_sceneConstants.giMaxBounces,
+                     m_sceneConstants.exposure, m_sceneConstants.debugMode,
                      sizeof(SceneConstants));
             // Also printf to console for reliable visibility
             printf("RTX CB: sun=(%f,%f,%f) amb=(%f,%f,%f) fog=(%f,%f,%f) sunI=%f ambI=%f exp=%f debug=%d\n",
@@ -1109,8 +1132,8 @@ void RTXRenderer::UpdateSceneParams(
                 fprintf(dumpFile, "  frameCount=%u  toneMapMode=%u  skyBlendFactor=%.4f  debugMode=%d\n",
                         m_sceneConstants.frameCount, m_sceneConstants.toneMapMode,
                         m_sceneConstants.skyBlendFactor, m_sceneConstants.debugMode);
-                fprintf(dumpFile, "  pad0=%.4f  pad1=%.4f  pad2=%.4f  pad3=%.4f\n",
-                        m_sceneConstants.pad0, m_sceneConstants.pad1,
+                fprintf(dumpFile, "  giMaxBounces=%u  pad1=%.4f  pad2=%.4f  pad3=%.4f\n",
+                        m_sceneConstants.giMaxBounces, m_sceneConstants.pad1,
                         m_sceneConstants.pad2, m_sceneConstants.pad3);
                 fprintf(dumpFile, "--- Computed GPU values ---\n");
                 float gpuSunR = m_sceneConstants.sunColor[0] * m_sceneConstants.sunIntensity;
@@ -1291,8 +1314,8 @@ void RTXRenderer::DispatchAndPresent() {
                     auto& texMgr = TextureManager::GetInstance();
                     for (size_t i = 0; i < mesh.materials.size(); i++) {
                         Material& mat = mesh.materials[i];
-                        // Only re-resolve materials that are still at default white (index 0)
-                        if (mat.textureIndex != 0) continue;
+                        // Re-resolve any fallback material (reserved SRVs 0,1,2).
+                        if (mat.textureIndex > 2) continue;
 
                         // Use the durable OTR path string (preferred over raw pointer)
                         const char* otrPath = nullptr;
@@ -1400,14 +1423,14 @@ void RTXRenderer::DispatchAndPresent() {
             uint32_t totalUnresolved = 0;
             for (const auto& roomGeo : m_roomGeometry) {
                 for (const auto& mat : roomGeo.opaqueMesh.materials) {
-                    if (mat.textureIndex == 0) totalUnresolved++;
+                    if (mat.textureIndex <= 2) totalUnresolved++;
                 }
                 for (const auto& mat : roomGeo.alphaMesh.materials) {
-                    if (mat.textureIndex == 0) totalUnresolved++;
+                    if (mat.textureIndex <= 2) totalUnresolved++;
                 }
             }
             if (m_reResolveCounter <= 30 || totalUpdated > 0 || (m_reResolveCounter % 60) == 0) {
-                RTX_DIAG("Re-resolve frame %u: %u updated, %u still unresolved (textureIndex==0)",
+                RTX_DIAG("Re-resolve frame %u: %u updated, %u still unresolved (textureIndex<=2 fallback)",
                          m_reResolveCounter, totalUpdated, totalUnresolved);
             }
 
@@ -1763,23 +1786,23 @@ void RTXRenderer::DispatchAndPresent() {
 
     if (s_renderFrameCount <= 10 || (s_renderFrameCount % 300) == 0) {
         // Log material texture index stats for debugging white-texture issues
-        uint32_t totalMats = 0, texturedMats = 0, whiteMats = 0;
+        uint32_t totalMats = 0, texturedMats = 0, fallbackMats = 0;
         for (const auto& roomGeo : m_roomGeometry) {
             for (const auto& mat : roomGeo.opaqueMesh.materials) {
                 totalMats++;
-                if (mat.textureIndex > 0) texturedMats++;
-                else whiteMats++;
+                if (mat.textureIndex > 2) texturedMats++;
+                else fallbackMats++;
             }
             for (const auto& mat : roomGeo.alphaMesh.materials) {
                 totalMats++;
-                if (mat.textureIndex > 0) texturedMats++;
-                else whiteMats++;
+                if (mat.textureIndex > 2) texturedMats++;
+                else fallbackMats++;
             }
         }
-        RTX_DIAG("RTXRenderer: DispatchRays %ux%u, TLAS=0x%llX, texTable=0x%llX, materials: %u total, %u textured, %u white(idx=0)",
+        RTX_DIAG("RTXRenderer: DispatchRays %ux%u, TLAS=0x%llX, texTable=0x%llX, materials: %u total, %u textured, %u fallback(idx<=2)",
                  m_device->GetWidth(), m_device->GetHeight(),
                  (unsigned long long)tlasAddr, (unsigned long long)texTableGPU.ptr,
-                 totalMats, texturedMats, whiteMats);
+                 totalMats, texturedMats, fallbackMats);
         auto& texMgr = TextureManager::GetInstance();
         RTX_DIAG("  TextureManager: nextSRV=%u, heap=%p, rooms=%zu",
                  texMgr.GetNextSRVIndex(), (void*)texMgr.GetSRVHeap(), m_roomGeometry.size());
@@ -2684,7 +2707,7 @@ void RTXRenderer::ResolveMaterialTextures(RoomGeometry& geometry) {
             // Skip materials that were already resolved during eager resolution
             // (in SceneGeometryExtractor::GetOrCreateMaterial). Re-resolving would
             // be wasteful and could incorrectly overwrite a valid textureIndex.
-            if (mat.textureIndex > 0) {
+            if (mat.textureIndex > 2) {
                 resolved++;
                 if (i < 10) {
                     RTX_DIAG("ResolveMaterialTextures [%s] mat %zu: already resolved -> SRV %u (skipping)",

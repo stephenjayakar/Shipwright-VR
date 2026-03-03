@@ -33,9 +33,9 @@
 #include "Common.hlsli"
 
 // Maximum recursion depth for TraceRay calls. Primary rays are depth 0.
-// Shadow, GI, and reflection rays are depth 1. No rays are traced at depth >= 1.
+// This supports primary + up to 4 recursive bounce rays.
 // This must match the D3D12_RAYTRACING_PIPELINE_CONFIG MaxTraceRecursionDepth on the C++ side.
-#define MAX_TRACE_RECURSION_DEPTH 2
+#define MAX_TRACE_RECURSION_DEPTH 5
 
 // Maximum HDR color value allowed in the output. Values above this are clamped.
 #define MAX_HDR_VALUE 10.0

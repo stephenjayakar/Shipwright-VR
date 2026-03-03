@@ -49,9 +49,8 @@ void Accumulate(uint3 DTid : SV_DispatchThreadID) {
         // max() with blendAlpha ensures we never go below the configured base.
         alpha = max(alpha, 1.0 / (float)(frameCount + 1));
     }
-    // Enforce a higher minimum to prevent excessive ghosting.
-    // 0.10 = 10% new frame weight is the absolute minimum for responsiveness.
-    alpha = clamp(alpha, 0.10, 1.0);
+    // Enforce stronger current-frame contribution to avoid smear/ghost trails.
+    alpha = clamp(alpha, 0.22, 1.0);
 
     // Variance-based rejection: if current frame differs significantly from
     // history, increase alpha to reject stale history faster. This reduces

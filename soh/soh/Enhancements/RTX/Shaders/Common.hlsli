@@ -27,7 +27,7 @@
 //   offset 320: fogStart, fogEnd, sunIntensity, ambientIntensity (16 bytes)
 //   offset 336: giIntensity, reflectionIntensity, skyIntensity, exposure (16 bytes)
 //   offset 352: frameCount, toneMapMode, skyBlendFactor, debugMode (16 bytes)
-//   offset 368: pad0, pad1, pad2, pad3 (16 bytes)
+//   offset 368: giMaxBounces, pad1, pad2, pad3 (16 bytes)
 //   Total: 384 bytes
 // ============================================================================
 cbuffer SceneConstants : register(b0) {
@@ -51,7 +51,7 @@ cbuffer SceneConstants : register(b0) {
     uint toneMapMode;           // offset 356
     float skyBlendFactor;       // offset 360
     int debugMode;              // offset 364
-    float pad0;                 // offset 368
+    uint giMaxBounces;          // offset 368
     float pad1;                 // offset 372
     float pad2;                 // offset 376
     float pad3;                 // offset 380

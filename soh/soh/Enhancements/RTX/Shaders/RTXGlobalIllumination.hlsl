@@ -24,8 +24,8 @@ RWTexture2D<float4> g_giOutput        : register(u2);
 
 // GI-specific constants (could be part of SceneConstants or a separate CB)
 // For now we reuse giIntensity from SceneConstants.
-// aoIntensity is mapped to pad0 (reserved for future use, defaults to 0.0).
-#define aoIntensity pad0
+// aoIntensity is mapped to pad1 (reserved for future use, defaults to 0.0).
+#define aoIntensity pad1
 
 // ============================================================================
 // Temporal accumulation blending factor.

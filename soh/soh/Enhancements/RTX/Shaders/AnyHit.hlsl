@@ -29,12 +29,6 @@ void AnyHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes a
     // Only perform alpha test for materials flagged as alpha-tested
     if (mat.isAlphaTested == 0) return;
 
-    // Decal/overlay geometry (e.g., dirt paths over grass in OoT) should never be
-    // discarded by alpha testing. These are rendered as a second pass on top of the
-    // base terrain; discarding them hides the path overlay entirely (Bug 2).
-    // The isDecal flag is set by SceneGeometryExtractor when ZMODE_DEC is detected.
-    if (mat.isDecal != 0) return;
-
     // If the texture hasn't been loaded yet (index 0 = default white, index 1 = checkerboard),
     // skip alpha testing — the default white texture has alpha=1 so the test would always pass
     // anyway, but accessing it avoids potential issues with uninitialized descriptors.
@@ -64,15 +58,14 @@ void AnyHit(inout RayPayload payload, in BuiltInTriangleIntersectionAttributes a
     uv = ApplyWrapModes(uv, mat.wrapModeS, mat.wrapModeT,
                         (float)mat.texWidthPx, (float)mat.texHeightPx);
 
-    // Sample texture alpha using bilinear sampler.
-    // Bilinear on native N64-res textures is the correct OoT look at RTX resolution.
-    float alpha = g_textures[NonUniformResourceIndex(mat.textureIndex)]
-                    .SampleLevel(g_samplerBilinear, uv, 0).a;
+    // Match ClosestHit sampling policy: bilinear filtering for all textures.
+    float alpha = g_textures[NonUniformResourceIndex(mat.textureIndex)].SampleLevel(g_samplerBilinear, uv, 0).a;
 
     // Alpha test threshold: N64 RDP uses 0x80/255 ≈ 0.5 as its reference.
     // We use 0.4 to give a small margin for bilinear filtering, which slightly
     // softens alpha edges on foliage textures and could clip valid opaque regions.
-    if (alpha < 0.4) {
+    float alphaThreshold = (mat.isDecal != 0) ? 0.65 : 0.4;
+    if (alpha < alphaThreshold) {
         IgnoreHit();
     }
 }

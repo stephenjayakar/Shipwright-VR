@@ -642,14 +642,13 @@ void GISystem::ApplySceneConfig(const SceneConfig& config) {
     // the shader automatically increases alpha for noisy/moving areas.
     m_blendAlpha = DEFAULT_BLEND_ALPHA;
 
-    // Scale max accumulation frames: more bounces benefit from more accumulation
-    // to converge, but cap at a reasonable maximum for responsiveness.
+    // Keep accumulation windows short for temporal stability in motion.
     if (config.maxBounces >= 3) {
-        m_maxAccumulationFrames = 256;
+        m_maxAccumulationFrames = 32;
     } else if (config.maxBounces >= 2) {
         m_maxAccumulationFrames = DEFAULT_MAX_ACCUMULATION_FRAMES;
     } else {
-        m_maxAccumulationFrames = 64;
+        m_maxAccumulationFrames = 16;
     }
 
     // Apply reflection quality setting from scene config

@@ -78,7 +78,7 @@ enum CombinerMode : uint32_t {
 //   offset 320: fogStart, fogEnd, sunIntensity, ambientIntensity (4 floats, 16 bytes)
 //   offset 336: giIntensity, reflectionIntensity, skyIntensity, exposure (4 floats, 16 bytes)
 //   offset 352: frameCount, toneMapMode, skyBlendFactor(float-as-bits), debugMode (16 bytes)
-//   offset 368: pad0, pad1, pad2, pad3 (16 bytes padding)
+//   offset 368: giMaxBounces, pad1, pad2, pad3 (16 bytes)
 //   Total: 384 bytes
 struct SceneConstants {
     // --- Camera matrices (offsets 0-255, 4x float4x4 = 256 bytes) ---
@@ -111,8 +111,8 @@ struct SceneConstants {
     float skyBlendFactor;      // offset 360: Sky blend factor [0,1]
     int32_t debugMode;         // offset 364: 0=normal, 1=albedo, 2=normals, 3=lighting, 4=depth
 
-    // --- Padding to 384 bytes (offsets 368-383) ---
-    float pad0;                // offset 368
+    // --- GI recursion + padding to 384 bytes (offsets 368-383) ---
+    uint32_t giMaxBounces;     // offset 368: GI bounce budget used by ClosestHit recursion
     float pad1;                // offset 372
     float pad2;                // offset 376
     float pad3;                // offset 380
@@ -144,7 +144,7 @@ static_assert(offsetof(SceneConstants, frameCount)          == 352, "frameCount 
 static_assert(offsetof(SceneConstants, toneMapMode)         == 356, "toneMapMode must be at offset 356");
 static_assert(offsetof(SceneConstants, skyBlendFactor)      == 360, "skyBlendFactor must be at offset 360");
 static_assert(offsetof(SceneConstants, debugMode)           == 364, "debugMode must be at offset 364");
-static_assert(offsetof(SceneConstants, pad0)                == 368, "pad0 must be at offset 368");
+static_assert(offsetof(SceneConstants, giMaxBounces)        == 368, "giMaxBounces must be at offset 368");
 static_assert(offsetof(SceneConstants, pad1)                == 372, "pad1 must be at offset 372");
 static_assert(offsetof(SceneConstants, pad2)                == 376, "pad2 must be at offset 376");
 static_assert(offsetof(SceneConstants, pad3)                == 380, "pad3 must be at offset 380");
@@ -218,6 +218,18 @@ struct N64MaterialState {
     uint8_t texSize;           // N64 image size   (G_IM_SIZ_*: 0=4b, 1=8b, 2=16b, 3=32b)
     bool alphaTest;            // Derived from render mode
     bool lightingEnabled;      // G_LIGHTING flag
+    // Colors from RDP state commands. Some OoT decals/path surfaces use these
+    // with mask-like textures, so we preserve them for shader-side tint recovery.
+    uint8_t primColorR;
+    uint8_t primColorG;
+    uint8_t primColorB;
+    uint8_t primColorA;
+    uint8_t envColorR;
+    uint8_t envColorG;
+    uint8_t envColorB;
+    uint8_t envColorA;
+    bool hasPrimColor;
+    bool hasEnvColor;
 
     // Texture wrap modes from G_SETTILE (tile 0).
     // N64 tile descriptor has mirror and clamp bits per axis plus a mask field:
@@ -264,6 +276,16 @@ struct N64MaterialState {
         texSize = 0;
         alphaTest = false;
         lightingEnabled = false;
+        primColorR = 255;
+        primColorG = 255;
+        primColorB = 255;
+        primColorA = 255;
+        envColorR = 255;
+        envColorG = 255;
+        envColorB = 255;
+        envColorA = 255;
+        hasPrimColor = false;
+        hasEnvColor = false;
         wrapModeS = 0;  // Default: WRAP
         wrapModeT = 0;  // Default: WRAP
         texScaleS = 1.0f; // Default: full scale

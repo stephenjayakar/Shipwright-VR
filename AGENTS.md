@@ -2626,3 +2626,39 @@ Result: Build succeeded. 0 Warning(s) 0 Error(s). Time Elapsed 00:00:08.70
 
 ### C6 and C7 Status: DONE ✅
 Both tasks were already marked DONE in PLAN.md. This test confirms the status with a fresh build and fresh launch.
+
+---
+
+## Agent Rule: BMP Handling (2026-03-02)
+
+To prevent OpenCode API image parsing errors, all agents must avoid opening `.bmp` files directly as image attachments.
+
+### Required workflow
+1. If a screenshot or image file is `.bmp`, convert it to `.png` or `.jpg` first using a shell tool.
+2. Only open or attach the converted `.png`/`.jpg` file.
+3. Keep the original `.bmp` for archival/debug purposes unless cleanup is explicitly requested.
+
+### Suggested conversion commands
+- ImageMagick (preferred when available): `magick input.bmp output.png`
+- FFmpeg fallback: `ffmpeg -y -i input.bmp output.png`
+- Repo helper script: `powershell -ExecutionPolicy Bypass -File scripts/read-bmp.ps1 -InputPath input.bmp`
+
+### Rationale
+- The OpenCode image API accepts: `image/jpeg`, `image/png`, `image/gif`, `image/webp`.
+- Raw BMP input can fail with: `The image data you provided does not represent a valid image`.
+
+---
+
+## Agent Rule: Share Recent Screenshots After Task Completion (2026-03-02)
+
+When a task changes runtime visuals (RTX shading, textures, denoise, water, lighting, post-processing, etc.), agents must post recent screenshots in the Discord thread immediately after finishing the implementation.
+
+### Required workflow
+1. Capture fresh runtime screenshots from the latest build/run.
+2. If captures are `.bmp`, convert them to `.png`/`.jpg` first (see BMP Handling rule above).
+3. Upload at least 2-4 representative screenshots (close-up + wider context when possible).
+4. Include short labels for each screenshot (e.g., frame number and what changed).
+5. Do this by default after finishing the task; do not wait for the user to ask.
+
+### Goal
+- Ensure the user can immediately verify visual quality/results without requesting screenshots separately.

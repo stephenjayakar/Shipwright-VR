@@ -14,10 +14,9 @@ void Miss(inout RayPayload payload) {
     // Sky gradient based on ray direction Y component
     float t = dir.y; // -1 (straight down) to +1 (straight up)
 
-    // Sky colors (in linear space, before gamma correction)
-    float3 zenithColor  = float3(0.15, 0.35, 0.85);   // Deep blue at top
-    float3 horizonColor = float3(0.6, 0.7, 0.85);      // Pale blue-white at horizon
-    float3 groundColor  = float3(0.15, 0.12, 0.1);     // Dark brown below horizon
+    float3 zenithColor  = max(float3(0.14, 0.30, 0.72), fogColor.rgb * float3(0.55, 0.65, 0.95));
+    float3 horizonColor = max(float3(0.45, 0.55, 0.72), fogColor.rgb * float3(0.85, 0.90, 1.00));
+    float3 groundColor  = float3(0.10, 0.11, 0.10);
 
     float3 skyColor;
     if (t > 0.0) {
@@ -35,8 +34,8 @@ void Miss(inout RayPayload payload) {
     float3 sunDir = normalize(sunDirection.xyz);
     if (length(sunDirection.xyz) > 0.01) {
         float sunDot = max(dot(dir, sunDir), 0.0);
-        float sunGlow = pow(sunDot, 32.0) * 0.5; // Concentrated glow
-        float sunHalo = pow(sunDot, 4.0) * 0.15;  // Wide halo
+        float sunGlow = pow(sunDot, 48.0) * 0.35;
+        float sunHalo = pow(sunDot, 6.0) * 0.08;
         float3 sunTint = sunColor.rgb;
         if (dot(sunTint, float3(1, 1, 1)) < 0.01) {
             sunTint = float3(1.0, 1.0, 1.0);  // Pure white fallback

@@ -39,13 +39,9 @@ void RayGen() {
     // Generate camera ray direction from pixel coordinates with temporal jitter
     // =========================================================================
 
-    // Sub-pixel jitter for temporal anti-aliasing
+    // Keep primary rays deterministic to avoid visible lighting shimmer/flashing.
+    // Temporal stability here is more important than TAA in the current RTX path.
     float2 jitter = float2(0.0, 0.0);
-    if (frameCount > 0) {
-        uint jitterIndex = frameCount;
-        jitter.x = HaltonSequence(jitterIndex, 2) - 0.5;
-        jitter.y = HaltonSequence(jitterIndex, 3) - 0.5;
-    }
 
     float2 pixelCenter = (float2)launchIndex + 0.5 + jitter;
     float2 ndc = pixelCenter / (float2)launchDim * 2.0 - 1.0;

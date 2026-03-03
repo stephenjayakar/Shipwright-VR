@@ -160,6 +160,8 @@ private:
         bool isDecal;
         uint8_t wrapModeS;
         uint8_t wrapModeT;
+        uint8_t primLuma;
+        uint8_t envLuma;
 
         bool operator==(const MaterialKey& other) const {
             return textureAddr == other.textureAddr &&
@@ -168,7 +170,9 @@ private:
                    isWater == other.isWater &&
                    isDecal == other.isDecal &&
                    wrapModeS == other.wrapModeS &&
-                   wrapModeT == other.wrapModeT;
+                   wrapModeT == other.wrapModeT &&
+                   primLuma == other.primLuma &&
+                   envLuma == other.envLuma;
         }
     };
 
@@ -181,6 +185,8 @@ private:
             h ^= std::hash<uint8_t>()(k.wrapModeS) << 4;
             h ^= std::hash<uint8_t>()(k.wrapModeT) << 5;
             h ^= std::hash<bool>()(k.isDecal) << 6;
+            h ^= std::hash<uint8_t>()(k.primLuma) << 7;
+            h ^= std::hash<uint8_t>()(k.envLuma) << 8;
             return h;
         }
     };
